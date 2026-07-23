@@ -1,0 +1,976 @@
+<!DOCTYPE html>
+<html lang="ko" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="선생님 평가와 커스텀 카드 수집으로 수업 태도를 키우는 보상 체크리스트">
+  <meta name="theme-color" content="#0f0e17">
+  <title>도장 스트릭 챌린지</title>
+  <!-- PWA: manifest.json은 추후 연결 -->
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+  <a class="skip-link" href="#main-content">본문으로 건너뛰기</a>
+
+  <!-- ═══════════════════════════════════════════
+       전역 UI (모든 화면 공통)
+       ═══════════════════════════════════════════ -->
+  <div class="autosave-bar" id="autosave-bar" role="status" aria-live="polite" aria-label="저장 상태"></div>
+  <p class="autosave-label" id="autosave-label" aria-live="polite">자동 저장됨</p>
+  <canvas id="confetti-canvas" aria-hidden="true"></canvas>
+  <p class="toast" id="toast" role="status" aria-live="polite"></p>
+
+  <div class="theme-switch" role="group" aria-label="테마 선택">
+    <button type="button" data-theme-choice="dark" aria-pressed="true"><span class="visually-hidden">다크 테마</span></button>
+    <button type="button" data-theme-choice="light" aria-pressed="false"><span class="visually-hidden">라이트 테마</span></button>
+    <button type="button" data-theme-choice="princess-pink" aria-pressed="false"><span class="visually-hidden">프린세스 핑크 테마</span></button>
+    <button type="button" data-theme-choice="vibrant" aria-pressed="false"><span class="visually-hidden">비비드 컬러 테마</span></button>
+  </div>
+
+
+  <main id="main-content">
+  <!-- ═══════════════════════════════════════════
+       VIEW: 랜딩 — / (로그인 / 방 입장)
+       ═══════════════════════════════════════════ -->
+  <div class="app-view" id="view-landing" data-view="landing" hidden>
+    <header class="landing-header">
+      <p class="header-eyebrow">STREAK CHALLENGE</p>
+      <h1>도장 <span class="fire">스트릭</span> 챌린지</h1>
+      <p class="header-sub">선생님 평가 · 커스텀 카드 · 보상 상점</p>
+    </header>
+
+    <div class="landing-main">
+      <!-- 선생님 로그인 -->
+      <section class="landing-panel" id="landing-teacher" aria-labelledby="landing-teacher-title">
+        <h2 id="landing-teacher-title">선생님 로그인</h2>
+        <p class="section-sub">이메일로 로그인하고 수업 방을 만드세요.</p>
+        <form id="form-teacher-login" action="#" method="post">
+          <div class="form-field">
+            <label for="teacher-email">이메일</label>
+            <input type="email" id="teacher-email" name="email" autocomplete="email" required placeholder="teacher@example.com">
+          </div>
+          <div class="form-field">
+            <label for="teacher-password">비밀번호</label>
+            <input type="password" id="teacher-password" name="password" autocomplete="current-password" required>
+          </div>
+          <button type="submit" class="btn btn-primary">로그인</button>
+          <p class="form-note">
+            <button type="button" class="btn-link" id="btn-show-signup">회원가입</button>
+          </p>
+        </form>
+      </section>
+
+      <!-- 학생 방 입장 -->
+      <section class="landing-panel" id="landing-student" aria-labelledby="landing-student-title">
+        <h2 id="landing-student-title">학생 입장</h2>
+        <p class="section-sub">선생님이 알려준 6자리 방 코드와 이름을 입력하세요.</p>
+        <form id="form-student-join" action="#" method="post">
+          <div class="form-field">
+            <label for="join-code">방 코드</label>
+            <input type="text" id="join-code" name="join_code" inputmode="text" maxlength="6" required placeholder="K7X2M9" autocapitalize="characters">
+          </div>
+          <div class="form-field">
+            <label for="join-name">이름</label>
+            <input type="text" id="join-name" name="name" autocomplete="name" required placeholder="홍길동">
+          </div>
+          <button type="submit" class="btn btn-primary">입장하기</button>
+        </form>
+      </section>
+    </div>
+  </div>
+
+
+  <!-- ═══════════════════════════════════════════
+       VIEW: 선생님 대시보드 — /dashboard
+       ═══════════════════════════════════════════ -->
+  <div class="app-view" id="view-teacher-dashboard" data-view="teacher-dashboard" hidden>
+    <header class="page-header">
+      <h1>내 수업 방</h1>
+      <button type="button" class="btn btn-primary" id="btn-create-room">+ 새 방 만들기</button>
+    </header>
+
+    <div class="view-main">
+      <ul class="room-list" id="room-list" role="list">
+        <!-- JS로 채움 — 샘플 구조 -->
+        <li class="room-card">
+          <article>
+            <h2><a href="#/room/eval">중2 수학 과외</a></h2>
+            <p class="room-meta">화·목·금 · 2026.06 ~ 2026.12</p>
+            <p class="room-code">입장 코드: <code>K7X2M9</code></p>
+            <ul class="room-actions" role="list">
+              <li><a href="#/room/eval">오늘 수업</a></li>
+              <li><a href="#/room/report">진척도</a></li>
+              <li><a href="#/room/approve">승인 대기</a></li>
+            </ul>
+          </article>
+        </li>
+      </ul>
+    </div>
+  </div>
+
+
+  <!-- ═══════════════════════════════════════════
+       VIEW: 선생님 — 방 관리 /room/[id]
+       하위: 평가 · 상점편집 · 카드아트 · 리포트 · 승인
+       ═══════════════════════════════════════════ -->
+  <div class="app-view" id="view-teacher-room" data-view="teacher-room" hidden>
+    <header class="page-header">
+      <nav class="breadcrumb" aria-label="경로">
+        <ol>
+          <li><a href="#dashboard">내 방</a></li>
+          <li aria-current="page">중2 수학 과외</li>
+        </ol>
+      </nav>
+      <h1 id="teacher-room-title">중2 수학 과외</h1>
+    </header>
+
+    <nav class="sub-nav" aria-label="선생님 메뉴">
+      <ul role="list">
+        <li><a href="#/room/eval" aria-current="page">오늘 수업</a></li>
+        <li><a href="#/room/shop">상점 편집</a></li>
+        <li><a href="#/room/art">카드 아트</a></li>
+        <li><a href="#/room/report">진척도</a></li>
+        <li><a href="#/room/approve">보상 승인</a></li>
+      </ul>
+    </nav>
+
+    <div class="view-main">
+      <!-- 오늘 수업 — 학생 평가 입력 (가장 많이 쓰는 화면) -->
+      <section id="teacher-eval" aria-labelledby="teacher-eval-title">
+        <h2 id="teacher-eval-title">오늘 수업 평가</h2>
+        <p class="session-date" id="teacher-session-date">2026년 7월 24일 (금)</p>
+
+        <form id="form-teacher-eval" action="#" method="post">
+          <fieldset class="eval-fieldset">
+            <legend>홍길동</legend>
+
+            <ul class="eval-checklist" role="list">
+              <li>
+                <label class="check-item" data-row="attitude">
+                  <input type="checkbox" name="attitude" value="1">
+                  <span class="check-box" aria-hidden="true"></span>
+                  <span class="check-label">
+                    <span class="name">수업 태도</span>
+                    선생님 눈 보고 바른 자세로 들었나요?
+                  </span>
+                </label>
+              </li>
+              <li>
+                <label class="check-item" data-row="participation">
+                  <input type="checkbox" name="participation" value="1">
+                  <span class="check-box" aria-hidden="true"></span>
+                  <span class="check-label">
+                    <span class="name">수업 참여도</span>
+                    질문에 대답하거나 필기를 했나요?
+                  </span>
+                </label>
+              </li>
+              <li>
+                <label class="check-item" data-row="homework">
+                  <input type="checkbox" name="homework" value="1">
+                  <span class="check-box" aria-hidden="true"></span>
+                  <span class="check-label">
+                    <span class="name">숙제 확인</span>
+                    오늘 숙제를 다 해왔나요?
+                  </span>
+                </label>
+              </li>
+            </ul>
+
+            <fieldset class="praise-box">
+              <legend>칭찬 태그 <span class="praise-count">0 / 3</span></legend>
+              <div class="praise-chips" role="group" aria-label="오늘 잘한 것">
+                <label class="praise-chip"><input type="checkbox" name="praise" value="hand"><span>🙋 먼저 손 들고 발표</span></label>
+                <label class="praise-chip"><input type="checkbox" name="praise" value="ask"><span>🧠 모르는 걸 질문</span></label>
+                <label class="praise-chip"><input type="checkbox" name="praise" value="note"><span>✍️ 필기를 꼼꼼히</span></label>
+                <label class="praise-chip"><input type="checkbox" name="praise" value="time"><span>⏰ 제시간에 도착</span></label>
+                <label class="praise-chip"><input type="checkbox" name="praise" value="retry"><span>🔁 틀린 문제 다시 풀기</span></label>
+                <label class="praise-chip"><input type="checkbox" name="praise" value="help"><span>🤝 친구를 도와줌</span></label>
+                <label class="praise-chip"><input type="checkbox" name="praise" value="focus"><span>🎯 끝까지 집중</span></label>
+                <label class="praise-chip"><input type="checkbox" name="praise" value="grit"><span>💪 포기하지 않음</span></label>
+                <label class="praise-chip"><input type="checkbox" name="praise" value="prep"><span>📚 예습·복습 완료</span></label>
+                <label class="praise-chip"><input type="checkbox" name="praise" value="greet"><span>😊 밝게 인사</span></label>
+              </div>
+            </fieldset>
+
+            <fieldset class="struggle-box">
+              <legend>오늘 어려웠던 것 <span class="struggle-note">벌점 없음 · 관찰 기록</span></legend>
+              <div class="struggle-chips" role="group" aria-label="오늘 어려웠던 것">
+                <label class="struggle-chip"><input type="checkbox" name="struggle" value="sleepy"><span>😴 잠이 부족했어요</span></label>
+                <label class="struggle-chip"><input type="checkbox" name="struggle" value="phone"><span>📱 폰이 자꾸 생각났어요</span></label>
+                <label class="struggle-chip"><input type="checkbox" name="struggle" value="focus"><span>🌀 집중이 안 됐어요</span></label>
+                <label class="struggle-chip"><input type="checkbox" name="struggle" value="hard"><span>😰 어려워서 포기했어요</span></label>
+                <label class="struggle-chip"><input type="checkbox" name="struggle" value="lost"><span>🤯 뭘 해야 할지 몰랐어요</span></label>
+              </div>
+            </fieldset>
+
+            <div class="form-field">
+              <label for="teacher-memo">선생님 피드백</label>
+              <textarea id="teacher-memo" name="teacher_memo" rows="2" placeholder="오늘 수업에 대한 한마디…"></textarea>
+            </div>
+          </fieldset>
+
+          <button type="submit" class="btn btn-primary">평가 저장</button>
+        </form>
+      </section>
+
+      <!-- 상점 편집 -->
+      <section id="teacher-shop-edit" aria-labelledby="teacher-shop-title" hidden>
+        <h2 id="teacher-shop-title">상점 편집</h2>
+        <p class="section-sub">보상 이름·가격·한도·승인 필요 여부를 설정하세요.</p>
+        <button type="button" class="btn" id="btn-add-shop-item">+ 보상 추가</button>
+        <ul class="shop-edit-list" id="shop-edit-list" role="list">
+          <li class="shop-edit-item">
+            <form action="#" method="post">
+              <div class="form-field">
+                <label for="shop-item-icon-1">아이콘</label>
+                <input type="text" id="shop-item-icon-1" name="icon" value="🎵" maxlength="4">
+              </div>
+              <div class="form-field">
+                <label for="shop-item-name-1">이름</label>
+                <input type="text" id="shop-item-name-1" name="name" value="수업 시작 노래">
+              </div>
+              <div class="form-field">
+                <label for="shop-item-price-1">가격 (P)</label>
+                <input type="number" id="shop-item-price-1" name="price" value="25" min="0">
+              </div>
+              <label class="check-item">
+                <input type="checkbox" name="needs_approval" checked>
+                <span class="check-label"><span class="name">승인 필요</span></span>
+              </label>
+              <button type="submit" class="btn">저장</button>
+              <button type="button" class="btn btn-danger">삭제</button>
+            </form>
+          </li>
+        </ul>
+      </section>
+
+      <!-- 카드 아트 등록 -->
+      <section id="teacher-art" aria-labelledby="teacher-art-title" hidden>
+        <h2 id="teacher-art-title">카드 아트 등록</h2>
+        <p class="section-sub">등급별로 카드에 들어갈 사진을 등록하세요.</p>
+        <aside class="art-warn" role="note">
+          <p><strong>직접 촬영·제작한 이미지만</strong> 업로드해 주세요. 저작권·초상권 문제가 있는 이미지는 이용이 제한될 수 있습니다.</p>
+        </aside>
+        <ul class="art-grid" id="teacher-art-grid" role="list">
+          <li class="art-slot" data-grade="C">
+            <figure>
+              <figcaption>커먼</figcaption>
+              <img src="" alt="커먼 등급 카드 아트" width="160" height="224" hidden>
+              <button type="button" class="art-upload-btn">사진 등록</button>
+              <input type="file" class="art-file" accept="image/*" hidden>
+            </figure>
+          </li>
+          <li class="art-slot" data-grade="U">
+            <figure>
+              <figcaption>언커먼</figcaption>
+              <img src="" alt="언커먼 등급 카드 아트" width="160" height="224" hidden>
+              <button type="button" class="art-upload-btn">사진 등록</button>
+              <input type="file" class="art-file" accept="image/*" hidden>
+            </figure>
+          </li>
+          <li class="art-slot" data-grade="R">
+            <figure>
+              <figcaption>레어</figcaption>
+              <img src="" alt="레어 등급 카드 아트" width="160" height="224" hidden>
+              <button type="button" class="art-upload-btn">사진 등록</button>
+              <input type="file" class="art-file" accept="image/*" hidden>
+            </figure>
+          </li>
+          <li class="art-slot" data-grade="E">
+            <figure>
+              <figcaption>에픽</figcaption>
+              <img src="" alt="에픽 등급 카드 아트" width="160" height="224" hidden>
+              <button type="button" class="art-upload-btn">사진 등록</button>
+              <input type="file" class="art-file" accept="image/*" hidden>
+            </figure>
+          </li>
+          <li class="art-slot" data-grade="L">
+            <figure>
+              <figcaption>레전더리</figcaption>
+              <img src="" alt="레전더리 등급 카드 아트" width="160" height="224" hidden>
+              <button type="button" class="art-upload-btn">사진 등록</button>
+              <input type="file" class="art-file" accept="image/*" hidden>
+            </figure>
+          </li>
+          <li class="art-slot" data-grade="J">
+            <figure>
+              <figcaption>조커</figcaption>
+              <img src="" alt="조커 등급 카드 아트" width="160" height="224" hidden>
+              <button type="button" class="art-upload-btn">사진 등록</button>
+              <input type="file" class="art-file" accept="image/*" hidden>
+            </figure>
+          </li>
+        </ul>
+      </section>
+
+      <!-- 학생별 진척도 리포트 -->
+      <section id="teacher-report" aria-labelledby="teacher-report-title" hidden>
+        <h2 id="teacher-report-title">학생 진척도</h2>
+        <article class="student-report">
+          <h3>홍길동</h3>
+          <dl class="report-stats">
+            <div><dt>총 도장</dt><dd id="report-stamps">0</dd></div>
+            <div><dt>별 포인트</dt><dd id="report-points">0</dd></div>
+            <div><dt>최장 스트릭</dt><dd id="report-streak">0</dd></div>
+          </dl>
+        </article>
+      </section>
+
+      <!-- 보상 승인 대기 -->
+      <section id="teacher-approve" aria-labelledby="teacher-approve-title" hidden>
+        <h2 id="teacher-approve-title">보상 승인 대기</h2>
+        <ul class="approve-list" id="approve-list" role="list">
+          <li class="approve-item">
+            <article>
+              <p><strong>홍길동</strong> — 🎵 수업 시작 노래 (25P)</p>
+              <time datetime="2026-07-24">2026.07.24</time>
+              <div class="approve-actions">
+                <button type="button" class="btn btn-primary" data-action="approve">승인</button>
+                <button type="button" class="btn btn-danger" data-action="reject">거절</button>
+              </div>
+            </article>
+          </li>
+        </ul>
+        <p class="empty-state" id="approve-empty">승인 대기 중인 요청이 없어요.</p>
+      </section>
+    </div>
+  </div>
+
+
+  <!-- ═══════════════════════════════════════════
+       VIEW: 학생 앱 — /me (v8 프로토타입 기반)
+       ═══════════════════════════════════════════ -->
+  <div class="app-view" id="view-student" data-view="student">
+    <header class="page-header">
+      <p class="header-eyebrow">STREAK CHALLENGE</p>
+      <h1>도장 <span class="fire">스트릭</span> 챌린지</h1>
+      <p class="header-sub" id="header-schedule">2026년 6월 ~ 12월 · 화 · 목 · 금</p>
+    </header>
+
+    <!-- 지갑 / 포인트 요약 -->
+    <aside class="wallet-bar" aria-label="포인트 현황">
+      <div class="wallet-main">
+        <span class="wallet-star" aria-hidden="true">⭐</span>
+        <p class="wallet-balance">
+          <span class="wallet-num" id="w-balance">0</span>
+          <span class="wallet-unit">P</span>
+        </p>
+      </div>
+      <ul class="wallet-meta" role="list">
+        <li class="wallet-pill">누적 <strong id="w-earned">0</strong>P</li>
+        <li class="wallet-pill">사용 <strong id="w-spent">0</strong>P</li>
+        <li class="wallet-pill">🃏 <strong id="w-joker">0</strong>장</li>
+        <li class="wallet-pill">🎴 <strong id="w-cards">0</strong>/92</li>
+      </ul>
+    </aside>
+
+    <!-- 학생 탭 네비게이션 -->
+    <div class="tabs" role="tablist" aria-label="메인 메뉴">
+      <button type="button" class="tab active" id="tab-check" role="tab" data-panel="panel-check" aria-controls="panel-check" aria-selected="true" tabindex="0">체크리스트</button>
+      <button type="button" class="tab" id="tab-dex" role="tab" data-panel="panel-dex" aria-controls="panel-dex" aria-selected="false" tabindex="-1">카드 도감</button>
+      <button type="button" class="tab" id="tab-shop" role="tab" data-panel="panel-shop" aria-controls="panel-shop" aria-selected="false" tabindex="-1">보상 상점</button>
+      <button type="button" class="tab" id="tab-dash" role="tab" data-panel="panel-dash" aria-controls="panel-dash" aria-selected="false" tabindex="-1">대시보드</button>
+    </div>
+
+    <div class="page">
+
+
+      <!-- ─── 패널: 체크리스트 (/me) ─── -->
+      <section class="tab-panel active" id="panel-check" role="tabpanel" aria-labelledby="tab-check" tabindex="0">
+        <h2 id="tab-check-label" class="visually-hidden">체크리스트</h2>
+
+        <!-- 학생 정보 -->
+        <div class="info-strip">
+          <div class="info-box">
+            <label for="info-name">이름</label>
+            <input class="info-input" type="text" id="info-name" name="student_name" placeholder="홍길동" autocomplete="name">
+          </div>
+          <div class="info-box">
+            <label for="info-class">학년/반</label>
+            <input class="info-input" type="text" id="info-class" name="student_class" placeholder="중1-3반">
+          </div>
+        </div>
+
+        <!-- 월 선택 -->
+        <nav class="month-strip" id="month-strip" aria-label="월 선택">
+          <!-- JS로 채움 — 샘플 1개 -->
+          <button type="button" class="month-chip active" data-month="7" aria-pressed="true">
+            <span class="month-chip-emoji" aria-hidden="true">☀️</span>
+            <span class="month-chip-name">7월</span>
+            <span class="month-chip-stat">0 / 13 도장</span>
+          </button>
+        </nav>
+
+        <!-- 선생님 모드 잠금 -->
+        <aside class="teacher-bar" aria-label="선생님 모드">
+          <span aria-hidden="true">🔐</span>
+          <div>
+            <p class="teacher-bar-label" id="teacher-bar-label">선생님 모드 — 잠금됨</p>
+            <p class="teacher-bar-sub" id="teacher-bar-sub">피드백 입력 · 보상 승인을 하려면 해제하세요</p>
+          </div>
+          <button type="button" class="teacher-lock-btn" id="teacher-lock-btn">열기</button>
+        </aside>
+
+        <!-- 스트릭 현황 -->
+        <section class="streak-hero" aria-labelledby="streak-heading">
+          <span class="streak-fire" id="fire-emoji" aria-hidden="true">🔥</span>
+          <div class="streak-info">
+            <h2 id="streak-heading" class="streak-label">현재 연속 달성 (<span id="streak-month-label">7월</span>)</h2>
+            <p class="streak-count">
+              <span class="streak-num" id="streak-num">0</span>
+              <span class="streak-unit">일</span>
+            </p>
+            <p class="streak-desc" id="streak-desc">첫 번째 도장을 찍어봐요!</p>
+            <p class="streak-best" id="streak-best">최고 기록 0일 — 절대 사라지지 않아요</p>
+            <ul class="streak-dots" id="streak-dots" role="list" aria-label="연속 달성 진행">
+              <!-- JS로 채움 -->
+            </ul>
+          </div>
+        </section>
+
+        <!-- 스트릭 붕괴 회복 프롬프트 (v1) -->
+        <aside class="recovery-prompt" id="recovery-prompt" role="note" hidden>
+          <h3>연속이 끊겼어요</h3>
+          <p>하지만 최고 기록 <strong id="recovery-best">11</strong>일은 그대로예요.</p>
+          <p><strong id="recovery-bonus">3</strong>일만 다시 이어가면 리커버리 보너스 +10P!</p>
+          <button type="button" class="btn" id="btn-dismiss-recovery">알겠어요</button>
+        </aside>
+
+        <!-- 조커 카드 -->
+        <section class="joker-section" aria-labelledby="joker-heading">
+          <h2 id="joker-heading" class="joker-section-title">
+            조커 카드
+            <span class="joker-available" id="joker-available">보유 0장</span>
+          </h2>
+          <p class="joker-explainer">조커 카드는 <strong>하루 봐주기 카드</strong>예요. 조건 달성으로 얻거나, 상점에서 50P로 살 수 있어요.</p>
+
+          <ul class="joker-conditions" role="list">
+            <li class="joker-cond" id="jc-hw">
+              <span class="joker-earned-badge">획득!</span>
+              <span class="joker-cond-icon" aria-hidden="true">✏️</span>
+              <h3 class="joker-cond-name">숙제 3연속!</h3>
+              <p class="joker-cond-desc">숙제를 3번 연속으로 해오면 조커 1장!</p>
+              <ol class="joker-steps" aria-label="숙제 연속 진행">
+                <li class="joker-step-dot" id="hw-s0">✏️</li>
+                <li class="joker-step-dot" id="hw-s1">✏️</li>
+                <li class="joker-step-dot" id="hw-s2">✏️</li>
+              </ol>
+              <p class="joker-cond-label" id="hw-label">0 / 3회 달성</p>
+            </li>
+            <li class="joker-cond" id="jc-pw">
+              <span class="joker-earned-badge">획득!</span>
+              <span class="joker-cond-icon" aria-hidden="true">🌟</span>
+              <h3 class="joker-cond-name">한 주 전부 완벽!</h3>
+              <p class="joker-cond-desc">그 주 수업일 전부 도장을 받으면 조커 1장!</p>
+              <ol class="joker-steps" aria-label="주간 완벽 진행">
+                <li class="joker-step-dot" id="pw-s0">화</li>
+                <li class="joker-step-dot" id="pw-s1">목</li>
+                <li class="joker-step-dot" id="pw-s2">금</li>
+              </ol>
+              <p class="joker-cond-label" id="pw-label">0 / 3일 달성</p>
+            </li>
+          </ul>
+
+          <ul class="joker-cards-row" id="joker-cards-row" role="list" aria-label="보유 조커 카드">
+            <!-- JS로 채움 -->
+          </ul>
+        </section>
+
+        <!-- 주간 체크리스트 (샘플 1주 — JS가 전체 생성) -->
+        <div id="weeks-container">
+          <article class="week-card" data-week="4" aria-labelledby="week-4-title">
+            <header class="week-head">
+              <span class="week-num" aria-hidden="true">4</span>
+              <div>
+                <h3 id="week-4-title" class="week-title">4주차</h3>
+                <p class="week-range">7/21 ~ 7/24</p>
+                <span class="perfect-badge">퍼펙트 위크!</span>
+              </div>
+              <div class="week-progress">
+                <p class="week-progress-num">2 / 3</p>
+                <p class="week-progress-label">도장</p>
+              </div>
+            </header>
+
+            <div class="days-grid">
+              <!-- 화요일 -->
+              <article class="day-col complete" id="day-4-0" data-week="4" data-day="0">
+                <header class="day-head">
+                  <span class="day-name">화</span>
+                  <span class="day-stamp" aria-label="도장 획득">⭐</span>
+                </header>
+                <p class="day-date">
+                  <time datetime="2026-07-21">7/21</time>
+                </p>
+
+                <ul class="day-checklist" role="list">
+                  <li>
+                    <label class="check-item checked" data-row="attitude">
+                      <input type="checkbox" checked disabled>
+                      <span class="check-box" aria-hidden="true">😊</span>
+                      <span class="check-label"><span class="name">수업 태도</span>선생님 눈 보고 바른 자세로 들었나요?</span>
+                    </label>
+                  </li>
+                  <li>
+                    <label class="check-item checked" data-row="participation">
+                      <input type="checkbox" checked disabled>
+                      <span class="check-box" aria-hidden="true">📖</span>
+                      <span class="check-label"><span class="name">수업 참여도</span>질문에 대답하거나 필기를 했나요?</span>
+                    </label>
+                  </li>
+                  <li>
+                    <label class="check-item checked" data-row="homework">
+                      <input type="checkbox" checked disabled>
+                      <span class="check-box" aria-hidden="true">✏️</span>
+                      <span class="check-label"><span class="name">숙제 확인</span>오늘 숙제를 다 해왔나요?</span>
+                    </label>
+                  </li>
+                </ul>
+
+                <fieldset class="praise-box">
+                  <legend>오늘 잘한 것 <span class="praise-count">2 / 3</span></legend>
+                  <div class="praise-chips" role="group">
+                    <label class="praise-chip on"><input type="checkbox" checked disabled><span>🎯 끝까지 집중</span></label>
+                    <label class="praise-chip on"><input type="checkbox" checked disabled><span>✍️ 필기를 꼼꼼히</span></label>
+                  </div>
+                </fieldset>
+
+                <fieldset class="struggle-box">
+                  <legend>오늘 어려웠던 것</legend>
+                  <div class="struggle-chips" role="group">
+                    <label class="struggle-chip"><input type="checkbox" disabled><span>📱 폰이 자꾸 생각났어요</span></label>
+                  </div>
+                </fieldset>
+
+                <button type="button" class="card-btn ready">카드 보기</button>
+
+                <div class="day-memos">
+                  <label class="memo-label" for="memo-4-0">선생님 한마디</label>
+                  <textarea class="memo-input" id="memo-4-0" rows="2" readonly placeholder="선생님이 남긴 피드백이 여기에…"></textarea>
+                </div>
+              </article>
+
+              <!-- 목요일 -->
+              <article class="day-col complete" id="day-4-1" data-week="4" data-day="1">
+                <header class="day-head">
+                  <span class="day-name">목</span>
+                  <span class="day-stamp" aria-label="도장 획득">⭐</span>
+                </header>
+                <p class="day-date">
+                  <time datetime="2026-07-23">7/23</time>
+                </p>
+                <ul class="day-checklist" role="list">
+                  <li>
+                    <label class="check-item checked" data-row="attitude">
+                      <input type="checkbox" checked disabled>
+                      <span class="check-box" aria-hidden="true">😊</span>
+                      <span class="check-label"><span class="name">수업 태도</span>선생님 눈 보고 바른 자세로 들었나요?</span>
+                    </label>
+                  </li>
+                  <li>
+                    <label class="check-item" data-row="participation">
+                      <input type="checkbox" disabled>
+                      <span class="check-box" aria-hidden="true">📖</span>
+                      <span class="check-label"><span class="name">수업 참여도</span>질문에 대답하거나 필기를 했나요?</span>
+                    </label>
+                  </li>
+                  <li>
+                    <label class="check-item checked" data-row="homework">
+                      <input type="checkbox" checked disabled>
+                      <span class="check-box" aria-hidden="true">✏️</span>
+                      <span class="check-label"><span class="name">숙제 확인</span>오늘 숙제를 다 해왔나요?</span>
+                    </label>
+                  </li>
+                </ul>
+                <button type="button" class="card-btn ready">카드 보기</button>
+              </article>
+
+              <!-- 금요일 (오늘) -->
+              <article class="day-col today interacted" id="day-4-2" data-week="4" data-day="2">
+                <header class="day-head">
+                  <span class="day-name">금</span>
+                  <span class="day-stamp" aria-hidden="true">☆</span>
+                </header>
+                <p class="day-date">
+                  <time datetime="2026-07-24">7/24</time>
+                  <span class="today-tag">오늘</span>
+                </p>
+                <ul class="day-checklist" role="list">
+                  <li>
+                    <label class="check-item" data-row="attitude">
+                      <input type="checkbox" name="attitude">
+                      <span class="check-box" aria-hidden="true"></span>
+                      <span class="check-label"><span class="name">수업 태도</span>선생님 눈 보고 바른 자세로 들었나요?</span>
+                    </label>
+                  </li>
+                  <li>
+                    <label class="check-item" data-row="participation">
+                      <input type="checkbox" name="participation">
+                      <span class="check-box" aria-hidden="true"></span>
+                      <span class="check-label"><span class="name">수업 참여도</span>질문에 대답하거나 필기를 했나요?</span>
+                    </label>
+                  </li>
+                  <li>
+                    <label class="check-item" data-row="homework">
+                      <input type="checkbox" name="homework">
+                      <span class="check-box" aria-hidden="true"></span>
+                      <span class="check-label"><span class="name">숙제 확인</span>오늘 숙제를 다 해왔나요?</span>
+                    </label>
+                  </li>
+                </ul>
+
+                <fieldset class="praise-box">
+                  <legend>오늘 잘한 것 <span class="praise-count">0 / 3</span></legend>
+                  <div class="praise-chips" role="group">
+                    <label class="praise-chip"><input type="checkbox" name="praise" value="hand"><span>🙋 먼저 손 들고 발표</span></label>
+                    <label class="praise-chip"><input type="checkbox" name="praise" value="ask"><span>🧠 모르는 걸 질문</span></label>
+                    <label class="praise-chip"><input type="checkbox" name="praise" value="note"><span>✍️ 필기를 꼼꼼히</span></label>
+                    <label class="praise-chip"><input type="checkbox" name="praise" value="time"><span>⏰ 제시간에 도착</span></label>
+                    <label class="praise-chip"><input type="checkbox" name="praise" value="retry"><span>🔁 틀린 문제 다시 풀기</span></label>
+                    <label class="praise-chip"><input type="checkbox" name="praise" value="help"><span>🤝 친구를 도와줌</span></label>
+                    <label class="praise-chip"><input type="checkbox" name="praise" value="focus"><span>🎯 끝까지 집중</span></label>
+                    <label class="praise-chip"><input type="checkbox" name="praise" value="grit"><span>💪 포기하지 않음</span></label>
+                    <label class="praise-chip"><input type="checkbox" name="praise" value="prep"><span>📚 예습·복습 완료</span></label>
+                    <label class="praise-chip"><input type="checkbox" name="praise" value="greet"><span>😊 밝게 인사</span></label>
+                  </div>
+                </fieldset>
+
+                <fieldset class="struggle-box">
+                  <legend>오늘 어려웠던 것</legend>
+                  <div class="struggle-chips" role="group">
+                    <label class="struggle-chip"><input type="checkbox" name="struggle" value="sleepy"><span>😴 잠이 부족했어요</span></label>
+                    <label class="struggle-chip"><input type="checkbox" name="struggle" value="phone"><span>📱 폰이 자꾸 생각났어요</span></label>
+                    <label class="struggle-chip"><input type="checkbox" name="struggle" value="focus"><span>🌀 집중이 안 됐어요</span></label>
+                    <label class="struggle-chip"><input type="checkbox" name="struggle" value="hard"><span>😰 어려워서 포기했어요</span></label>
+                    <label class="struggle-chip"><input type="checkbox" name="struggle" value="lost"><span>🤯 뭘 해야 할지 몰랐어요</span></label>
+                  </div>
+                </fieldset>
+
+                <button type="button" class="card-btn" disabled>카드 보기</button>
+
+                <div class="day-memos">
+                  <label class="memo-label" for="memo-4-2">선생님 한마디</label>
+                  <textarea class="memo-input" id="memo-4-2" rows="2" placeholder="선생님이 남긴 피드백이 여기에…" readonly></textarea>
+                </div>
+              </article>
+            </div>
+          </article>
+        </div>
+
+        <!-- 주간 회고 (v1) -->
+        <section class="weekly-reflection" id="weekly-reflection" aria-labelledby="reflection-title" hidden>
+          <h2 id="reflection-title">이번 주 회고</h2>
+          <p class="section-sub">이번 주 나를 가장 도와준 건?</p>
+          <fieldset>
+            <legend class="visually-hidden">주간 회고 선택</legend>
+            <ul class="reflection-options" role="list">
+              <li><label><input type="radio" name="reflection" value="sleep"> 충분한 잠</label></li>
+              <li><label><input type="radio" name="reflection" value="plan"> 계획 세우기</label></li>
+              <li><label><input type="radio" name="reflection" value="teacher"> 선생님 도움</label></li>
+              <li><label><input type="radio" name="reflection" value="phone_away"> 폰 멀리 두기</label></li>
+            </ul>
+          </fieldset>
+          <button type="button" class="btn btn-primary" id="btn-save-reflection">저장</button>
+        </section>
+
+        <!-- 하단 액션 -->
+        <footer class="action-bar">
+          <button type="button" class="btn btn-save" id="save-btn">저장하기</button>
+          <button type="button" class="btn btn-load" id="export-csv-btn">CSV 내보내기</button>
+          <button type="button" class="btn btn-reset" id="reset-btn">초기화</button>
+        </footer>
+      </section>
+
+
+      <!-- ─── 패널: 카드 도감 (/me/dex) ─── -->
+      <section class="tab-panel" id="panel-dex" role="tabpanel" aria-labelledby="tab-dex" tabindex="0" hidden>
+        <h2 id="tab-dex-label" class="visually-hidden">카드 도감</h2>
+
+        <section class="section" aria-labelledby="badge-section-title">
+          <h3 id="badge-section-title" class="section-title">마일스톤 배지</h3>
+          <p class="section-sub">선생님과 약속이 필요 없는, 순수한 기록의 증표예요.</p>
+          <ul class="badge-grid" id="badge-grid" role="list">
+            <li class="badge got">
+              <span class="badge-icon" aria-hidden="true">⚡</span>
+              <p class="badge-name">점화</p>
+              <p class="badge-req">3연속</p>
+            </li>
+            <li class="badge">
+              <span class="badge-icon" aria-hidden="true">🌊</span>
+              <p class="badge-name">파도</p>
+              <p class="badge-req">6연속</p>
+            </li>
+            <!-- JS로 전체 생성 -->
+          </ul>
+        </section>
+
+        <section class="section" aria-labelledby="dex-section-title">
+          <header class="section-header">
+            <h3 id="dex-section-title" class="section-title">카드 도감</h3>
+            <p class="dex-count" id="dex-count">0 / 92</p>
+          </header>
+          <p class="section-sub">체크를 1개라도 하면 그날의 카드가 만들어져요. 카드를 눌러 크게 보고 저장·공유할 수 있어요.</p>
+
+          <ul class="dex-legend" id="dex-legend" role="list" aria-label="등급 범례">
+            <li class="dex-lg" data-grade="C">커먼</li>
+            <li class="dex-lg" data-grade="U">언커먼</li>
+            <li class="dex-lg" data-grade="R">레어 ✨</li>
+            <li class="dex-lg" data-grade="E">에픽 ✨</li>
+            <li class="dex-lg" data-grade="L">레전더리 ✨</li>
+            <li class="dex-lg" data-grade="J">조커 ✨</li>
+          </ul>
+
+          <div id="dex-body">
+            <!-- 샘플: 7월 슬롯 -->
+            <section class="dex-month" aria-labelledby="dex-july-title">
+              <h4 id="dex-july-title" class="dex-month-head"><strong>7월</strong> · 0 / 13</h4>
+              <ul class="dex-grid" role="list">
+                <li><button type="button" class="dex-slot locked" aria-label="7/2 미획득"><span aria-hidden="true">🔒</span></button></li>
+                <li><button type="button" class="dex-slot locked" aria-label="7/3 미획득"><span aria-hidden="true">🔒</span></button></li>
+                <li><button type="button" class="dex-slot grade-R" aria-label="7/7 레어 카드"><span class="dex-grade">R</span></button></li>
+                <!-- JS로 92칸 생성 -->
+              </ul>
+            </section>
+          </div>
+        </section>
+      </section>
+
+
+      <!-- ─── 패널: 보상 상점 (/me/shop) ─── -->
+      <section class="tab-panel" id="panel-shop" role="tabpanel" aria-labelledby="tab-shop" tabindex="0" hidden>
+        <h2 id="tab-shop-label" class="visually-hidden">보상 상점</h2>
+
+        <section class="section" aria-labelledby="shop-section-title">
+          <h3 id="shop-section-title" class="section-title">보상 상점</h3>
+          <aside class="shop-note" role="note">
+            <p>⭐P는 <strong>절대 사라지지 않아요.</strong> 도장을 놓친 날도 체크한 만큼 쌓입니다.</p>
+            <p>🔐 표시가 있는 보상은 <strong>선생님 승인</strong>이 필요해요.</p>
+          </aside>
+
+          <ul class="shop-grid" id="shop-grid" role="list">
+            <li class="shop-item">
+              <article>
+                <span class="shop-icon" aria-hidden="true">🌌</span>
+                <h4 class="shop-name">프레임: 오로라</h4>
+                <p class="shop-desc">카드 테두리를 오로라빛으로. 영구 소유.</p>
+                <p class="shop-price">30P</p>
+                <button type="button" class="btn shop-buy-btn">구매</button>
+              </article>
+            </li>
+            <li class="shop-item needs-approval">
+              <article>
+                <span class="shop-icon" aria-hidden="true">🎵</span>
+                <h4 class="shop-name">수업 시작 노래 <span class="approval-badge" aria-label="승인 필요">🔐</span></h4>
+                <p class="shop-desc">수업 시작 전 원하는 노래 1곡 신청. 월 2회</p>
+                <p class="shop-price">25P</p>
+                <button type="button" class="btn shop-buy-btn">구매 요청</button>
+              </article>
+            </li>
+            <!-- JS로 전체 생성 -->
+          </ul>
+        </section>
+
+        <section class="section" aria-labelledby="frame-section-title">
+          <h3 id="frame-section-title" class="section-title">레어도 자동 프레임</h3>
+          <p class="section-sub">프레임은 구매하지 않아도 카드 등급에 맞춰 자동으로 적용돼요.</p>
+          <ul class="frame-pick" id="frame-pick" role="list">
+            <!-- JS로 6개 등급 프레임 안내 생성 -->
+          </ul>
+        </section>
+
+        <section class="section" aria-labelledby="art-section-title">
+          <h3 id="art-section-title" class="section-title">나만의 카드 아트</h3>
+          <p class="section-sub">등급마다 다른 그림을 넣을 수 있어요.</p>
+          <aside class="art-warn" role="note">
+            <p><strong>내가 찍은 사진이나 내가 그린 그림</strong>만 넣어주세요.</p>
+            <p>업로드한 그림은 <strong>이 브라우저에만</strong> 저장됩니다.</p>
+          </aside>
+          <ul class="art-grid" id="art-grid" role="list">
+            <li class="art-slot" data-grade="C">
+              <figure>
+                <figcaption>커먼</figcaption>
+                <button type="button" class="art-upload-btn">+ 사진</button>
+              </figure>
+            </li>
+            <li class="art-slot" data-grade="L">
+              <figure>
+                <figcaption>레전더리</figcaption>
+                <button type="button" class="art-upload-btn">+ 사진</button>
+              </figure>
+            </li>
+            <!-- JS로 6등급 생성 -->
+          </ul>
+          <input type="file" id="art-file" accept="image/*" hidden>
+        </section>
+
+        <section class="section" aria-labelledby="ledger-section-title">
+          <h3 id="ledger-section-title" class="section-title">사용 내역</h3>
+          <ul class="ledger" id="ledger" role="list">
+            <li class="ledger-empty">아직 사용한 보상이 없어요.</li>
+          </ul>
+        </section>
+      </section>
+
+
+      <!-- ─── 패널: 대시보드 (/me/stats) ─── -->
+      <section class="tab-panel" id="panel-dash" role="tabpanel" aria-labelledby="tab-dash" tabindex="0" hidden>
+        <h2 id="tab-dash-label" class="visually-hidden">대시보드</h2>
+
+        <ul class="dash-grid" role="list">
+          <li class="dash-card">
+            <p class="dash-label">총 도장</p>
+            <p class="dash-value" id="d-stamps">0</p>
+            <p class="dash-sub" id="d-stamps-sub">전체 92일 중</p>
+          </li>
+          <li class="dash-card">
+            <p class="dash-label">별 포인트</p>
+            <p class="dash-value" id="d-points">0</p>
+            <p class="dash-sub" id="d-points-sub">누적 0P</p>
+          </li>
+          <li class="dash-card">
+            <p class="dash-label">최장 스트릭</p>
+            <p class="dash-value" id="d-best">0</p>
+            <p class="dash-sub">6월~12월 통합</p>
+          </li>
+          <li class="dash-card">
+            <p class="dash-label">퍼펙트 위크</p>
+            <p class="dash-value" id="d-perfect">0</p>
+            <p class="dash-sub" id="d-perfect-sub">전체 33주 중</p>
+          </li>
+        </ul>
+
+        <figure class="chart-box">
+          <figcaption class="chart-title">월별 도장 획득</figcaption>
+          <div class="chart-canvas-wrap">
+            <canvas id="chart-month" role="img" aria-label="월별 도장 획득 막대그래프"></canvas>
+          </div>
+        </figure>
+
+        <figure class="chart-box">
+          <figcaption class="chart-title">주별 완료율 추이</figcaption>
+          <div class="chart-canvas-wrap">
+            <canvas id="chart-week" role="img" aria-label="주별 완료율 선그래프"></canvas>
+          </div>
+        </figure>
+
+        <figure class="chart-box">
+          <figcaption class="chart-title">평가 항목별 완료율</figcaption>
+          <div class="chart-canvas-wrap short">
+            <canvas id="chart-item" role="img" aria-label="평가 항목별 완료율 도넛 차트"></canvas>
+          </div>
+        </figure>
+
+        <figure class="chart-box">
+          <figcaption class="chart-title">내가 가장 많이 받은 칭찬</figcaption>
+          <div class="chart-canvas-wrap">
+            <canvas id="chart-praise" role="img" aria-label="칭찬 태그 빈도 차트"></canvas>
+          </div>
+        </figure>
+
+        <figure class="chart-box">
+          <figcaption class="chart-title">가장 자주 걸린 방해 요인</figcaption>
+          <div class="chart-canvas-wrap">
+            <canvas id="chart-struggle" role="img" aria-label="방해 요인 빈도 차트"></canvas>
+          </div>
+        </figure>
+
+        <figure class="chart-box">
+          <figcaption class="chart-title">카드 등급 분포</figcaption>
+          <div class="chart-canvas-wrap short">
+            <canvas id="chart-grade" role="img" aria-label="카드 등급 분포 차트"></canvas>
+          </div>
+        </figure>
+      </section>
+
+    </div>
+  </div>
+  </main>
+
+
+  <!-- ═══════════════════════════════════════════
+       다이얼로그 / 모달
+       ═══════════════════════════════════════════ -->
+
+  <!-- 선생님 PIN -->
+  <dialog class="modal" id="pin-dialog" aria-labelledby="pin-dialog-title">
+    <form method="dialog" id="form-pin">
+      <h2 id="pin-dialog-title">선생님 PIN 입력</h2>
+      <p class="modal-sub" id="pin-modal-sub">4자리 PIN을 입력하세요</p>
+
+      <div class="pin-dots" aria-hidden="true">
+        <span class="pin-dot" id="pd0"></span>
+        <span class="pin-dot" id="pd1"></span>
+        <span class="pin-dot" id="pd2"></span>
+        <span class="pin-dot" id="pd3"></span>
+      </div>
+
+      <div class="pin-keypad" role="group" aria-label="PIN 키패드">
+        <button type="button" class="pin-key" data-key="1">1</button>
+        <button type="button" class="pin-key" data-key="2">2</button>
+        <button type="button" class="pin-key" data-key="3">3</button>
+        <button type="button" class="pin-key" data-key="4">4</button>
+        <button type="button" class="pin-key" data-key="5">5</button>
+        <button type="button" class="pin-key" data-key="6">6</button>
+        <button type="button" class="pin-key" data-key="7">7</button>
+        <button type="button" class="pin-key" data-key="8">8</button>
+        <button type="button" class="pin-key" data-key="9">9</button>
+        <button type="button" class="pin-key" data-key="del">⌫</button>
+        <button type="button" class="pin-key" data-key="0">0</button>
+        <button type="submit" class="pin-key" value="cancel">취소</button>
+      </div>
+
+      <p class="pin-error" id="pin-error" role="alert"></p>
+      <button type="button" class="btn" id="change-pin-btn" hidden>PIN 변경하기</button>
+    </form>
+  </dialog>
+
+  <!-- 조커 사용 날짜 선택 -->
+  <dialog class="modal" id="joker-dialog" aria-labelledby="joker-dialog-title">
+    <h2 id="joker-dialog-title">어느 날에 조커를 쓸까요?</h2>
+    <p class="modal-sub">하나라도 체크가 있는 미완성 날에만 사용할 수 있어요</p>
+    <ul class="modal-days" id="modal-days" role="list">
+      <!-- JS로 채움 -->
+    </ul>
+    <button type="button" class="btn modal-cancel" id="joker-dialog-cancel">취소</button>
+  </dialog>
+
+  <!-- 카드 미리보기 -->
+  <dialog class="modal modal-card" id="card-dialog" aria-labelledby="card-dialog-title">
+    <h2 id="card-dialog-title" class="visually-hidden">카드 미리보기</h2>
+    <div class="card-stage" id="card-stage">
+      <div class="card-flipper" id="card-flipper">
+        <figure class="card-face card-front">
+          <canvas id="card-canvas" width="700" height="980" role="img" aria-label="생성된 카드 앞면 이미지"></canvas>
+          <span class="card-glare" aria-hidden="true"></span>
+        </figure>
+        <section class="card-face card-back" role="img" aria-label="도장 스트릭 카드 뒷면">
+          <div class="card-back-orbit" aria-hidden="true"></div>
+          <div class="card-back-core" aria-hidden="true">★</div>
+          <p class="card-back-title">STREAK<br>CARD</p>
+          <p class="card-back-sub">도장 스트릭 챌린지</p>
+        </section>
+      </div>
+    </div>
+    <p class="card-move-hint">마우스나 손가락으로 움직여 기울이고, 좌우로 밀거나 눌러 뒤집어 보세요.</p>
+    <menu class="card-actions">
+      <li><button type="button" class="card-act" id="btn-flip-card" aria-pressed="false">뒷면 보기</button></li>
+      <li><button type="button" class="card-act primary" id="btn-share-card">공유하기</button></li>
+      <li><button type="button" class="card-act" id="btn-download-card">이미지 저장</button></li>
+      <li><button type="button" class="card-act" id="btn-close-card">닫기</button></li>
+    </menu>
+  </dialog>
+
+  <footer class="site-footer">
+    <p><small>&copy; 2026 도장 스트릭 챌린지</small></p>
+    <p><small>업로드 이미지는 직접 촬영·제작한 것만 사용해 주세요.</small></p>
+  </footer>
+
+  <noscript>
+    <p class="noscript-warn">이 앱은 자바스크립트가 필요해요. 브라우저 설정에서 켜 주세요.</p>
+  </noscript>
+
+  <script src="script.js" defer></script>
+</body>
+</html>
