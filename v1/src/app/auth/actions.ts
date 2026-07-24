@@ -41,6 +41,20 @@ export async function signInTeacher(formData: FormData) {
   redirect("/dashboard");
 }
 
+function siteOrigin(requestHeaders: Headers) {
+  const configured = process.env.NEXT_PUBLIC_SITE_URL?.trim().replace(/\/$/, "");
+  if (configured) return configured;
+
+  const forwardedHost = requestHeaders.get("x-forwarded-host");
+  const proto = requestHeaders.get("x-forwarded-proto") || "https";
+  if (forwardedHost) return `${proto}://${forwardedHost}`;
+
+  const origin = requestHeaders.get("origin")?.replace(/\/$/, "");
+  if (origin) return origin;
+
+  return "http://localhost:3000";
+}
+
 export async function signUpTeacher(formData: FormData) {
   if (!hasSupabaseEnv()) {
     homeRedirect("error", "먼저 Supabase 환경변수를 설정해 주세요.");
@@ -54,10 +68,7 @@ export async function signUpTeacher(formData: FormData) {
   }
 
   const requestHeaders = await headers();
-  const origin =
-    process.env.NEXT_PUBLIC_SITE_URL ||
-    requestHeaders.get("origin") ||
-    "http://localhost:3000";
+  const origin = siteOrigin(requestHeaders);
   const supabase = await createClient();
   const { data, error } = await supabase.auth.signUp({
     email,
