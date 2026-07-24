@@ -1,9 +1,15 @@
-import Link from "next/link";
 import { notFound } from "next/navigation";
 import { requestPurchase } from "@/app/me/purchase-actions";
 import { AppShell } from "@/components/app-shell";
+import { SignOutButton } from "@/components/sign-out-button";
+import { StudentTabBar, type StudentTabId } from "@/components/student-tab-bar";
 import { SubmitButton } from "@/components/submit-button";
 import { deriveProgress, evaluationCount } from "@/domain/progress";
+import {
+  countPerfectWeeks,
+  tallyTags,
+  weeklyCompletionSeries,
+} from "@/domain/stats";
 import { requireActiveStudent } from "@/lib/auth/viewer";
 import { createClient } from "@/lib/supabase/server";
 
@@ -21,6 +27,27 @@ const gradeNames = {
   J: "조커",
 } as const;
 
+const praiseCatalog = [
+  ["hand", "🙋 발표"],
+  ["ask", "🧠 질문"],
+  ["note", "✍️ 필기"],
+  ["time", "⏰ 시간"],
+  ["retry", "🔁 다시 풀기"],
+  ["help", "🤝 도움"],
+  ["focus", "🎯 집중"],
+  ["grit", "💪 포기 않음"],
+  ["prep", "📚 예복습"],
+  ["greet", "😊 인사"],
+] as const;
+
+const struggleCatalog = [
+  ["sleepy", "😴 잠 부족"],
+  ["phone", "📱 폰"],
+  ["focus", "🌀 집중 안 됨"],
+  ["hard", "😰 어려움"],
+  ["lost", "🤯 뭘 할지"],
+] as const;
+
 const purchaseStatusLabel = {
   pending: "승인 대기",
   approved: "승인됨",
@@ -30,7 +57,7 @@ const purchaseStatusLabel = {
 
 const sectionCopy: Record<string, { title: string; description: string }> = {
   dex: {
-    title: "카드 도감",
+    title: "카드 보관함",
     description: "획득 카드와 아직 잠긴 수업일 슬롯을 보여줍니다.",
   },
   shop: {
@@ -40,7 +67,7 @@ const sectionCopy: Record<string, { title: string; description: string }> = {
   stats: {
     title: "내 성장 그래프",
     description:
-      "완료율, 등급 분포, 스트릭·월별 도장을 한눈에 보여줍니다.",
+      "도장·퍼펙트 위크·주간 추이·칭찬/방해 요인까지 한눈에 보여줍니다.",
   },
 };
 
@@ -56,6 +83,10 @@ export default async function StudentSectionPage({
   const { section } = await params;
   const copy = sectionCopy[section];
   if (!copy) notFound();
+  if (section !== "dex" && section !== "shop" && section !== "stats") {
+    notFound();
+  }
+  const activeTab: StudentTabId = section;
   const query = await searchParams;
   const error = first(query.error);
   const message = first(query.message);
@@ -219,6 +250,32 @@ export default async function StudentSectionPage({
       100,
   );
   const stampRate = Math.round((stamps / totalPast) * 100);
+  const perfectWeeks = countPerfectWeeks(pastSessions, allEvaluations);
+  const weeklySeries = weeklyCompletionSeries(pastSessions, allEvaluations);
+  const praiseTallies = tallyTags(
+    allReflections.map((reflection) => ({ tags: reflection.praise_tags })),
+    praiseCatalog,
+  );
+  const struggleTallies = tallyTags(
+    allReflections.map((reflection) => ({ tags: reflection.struggle_tags })),
+    struggleCatalog,
+  );
+  const itemRates = [
+    { key: "attitude", label: "태도", rate: completionRate("attitude"), color: "#8b70e8" },
+    { key: "participation", label: "참여", rate: completionRate("participation"), color: "#74d2a1" },
+    { key: "homework", label: "숙제", rate: completionRate("homework"), color: "#ff9f7a" },
+  ];
+  const donutGradient = (() => {
+    const total = itemRates.reduce((sum, row) => sum + row.rate, 0) || 1;
+    let cursor = 0;
+    const parts = itemRates.map((row) => {
+      const start = cursor;
+      const sweep = (row.rate / total) * 360;
+      cursor += sweep;
+      return `${row.color} ${start}deg ${cursor}deg`;
+    });
+    return `conic-gradient(${parts.join(", ")})`;
+  })();
   const spent =
     purchases
       ?.filter((purchase) => purchase.status === "approved")
@@ -242,13 +299,8 @@ export default async function StudentSectionPage({
       eyebrow={room?.title || "Student"}
       title={copy.title}
       description={copy.description}
+      headerAccessory={<SignOutButton />}
     >
-      <div className="actions">
-        <Link className="button" href="/me">
-          학생 홈
-        </Link>
-      </div>
-
       {error && (
         <p className="alert alert--error" role="alert">
           {error}
@@ -303,8 +355,8 @@ export default async function StudentSectionPage({
         <>
           <div className="student-summary stats-summary">
             <div>
-              <span>획득 카드</span>
-              <strong>{cardCount}장</strong>
+              <span>총 별 포인트</span>
+              <strong>{progress.totalPoints}P</strong>
             </div>
             <div>
               <span>완성 도장</span>
@@ -316,10 +368,42 @@ export default async function StudentSectionPage({
               <span>최고 스트릭</span>
               <strong>{progress.bestStreak}일</strong>
             </div>
+            <div>
+              <span>퍼펙트 위크</span>
+              <strong>{perfectWeeks}회</strong>
+            </div>
           </div>
 
           <section className="stats-panel">
             <h2>평가 항목 완료율</h2>
+            <div className="stats-donut-row">
+              <div
+                className="stats-donut"
+                style={{ background: donutGradient }}
+                aria-hidden="true"
+              >
+                <span>
+                  {Math.round(
+                    itemRates.reduce((sum, row) => sum + row.rate, 0) / 3,
+                  )}
+                  %
+                </span>
+              </div>
+              <ul className="stats-donut-legend">
+                {itemRates.map((row) => (
+                  <li key={row.key}>
+                    <i style={{ background: row.color }} />
+                    <strong>{row.label}</strong>
+                    <span>{row.rate}%</span>
+                  </li>
+                ))}
+                <li>
+                  <i style={{ background: "#c9b8ef" }} />
+                  <strong>자기관찰</strong>
+                  <span>{reflectionRate}%</span>
+                </li>
+              </ul>
+            </div>
             {[
               ["수업 태도", completionRate("attitude")],
               ["수업 참여", completionRate("participation")],
@@ -336,6 +420,64 @@ export default async function StudentSectionPage({
                 </div>
               </div>
             ))}
+          </section>
+
+          <section className="stats-panel">
+            <h2>주별 완료율</h2>
+            {weeklySeries.length ? (
+              <div className="week-line" aria-label="주별 완료율 추이">
+                <svg viewBox="0 0 320 120" role="img">
+                  <title>주별 완료율</title>
+                  <polyline
+                    fill="none"
+                    stroke="#8b70e8"
+                    strokeWidth="3"
+                    strokeLinejoin="round"
+                    strokeLinecap="round"
+                    points={weeklySeries
+                      .map((row, index) => {
+                        const x =
+                          weeklySeries.length === 1
+                            ? 160
+                            : (index / (weeklySeries.length - 1)) * 300 + 10;
+                        const y = 100 - (row.rate / 100) * 80;
+                        return `${x},${y}`;
+                      })
+                      .join(" ")}
+                  />
+                  {weeklySeries.map((row, index) => {
+                    const x =
+                      weeklySeries.length === 1
+                        ? 160
+                        : (index / (weeklySeries.length - 1)) * 300 + 10;
+                    const y = 100 - (row.rate / 100) * 80;
+                    return (
+                      <circle
+                        key={row.key}
+                        cx={x}
+                        cy={y}
+                        r="4.5"
+                        fill="#6048c7"
+                      >
+                        <title>
+                          {row.label} · {row.rate}% ({row.done}/{row.total})
+                        </title>
+                      </circle>
+                    );
+                  })}
+                </svg>
+                <ul className="week-line__labels">
+                  {weeklySeries.map((row) => (
+                    <li key={`${row.key}-label`}>
+                      <strong>{row.label}</strong>
+                      <span>{row.rate}%</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ) : (
+              <p className="empty-state">아직 집계할 수업일이 없어요.</p>
+            )}
           </section>
 
           <section className="stats-panel">
@@ -361,6 +503,66 @@ export default async function StudentSectionPage({
               </ul>
             ) : (
               <p className="empty-state">아직 획득한 카드가 없어요.</p>
+            )}
+          </section>
+
+          <section className="stats-panel">
+            <h2>가장 많이 받은 칭찬</h2>
+            {praiseTallies.length ? (
+              <ul className="tag-rank" aria-label="칭찬 태그 순위">
+                {praiseTallies.slice(0, 6).map((row) => {
+                  const max = praiseTallies[0]?.count || 1;
+                  return (
+                    <li key={row.key}>
+                      <div>
+                        <strong>{row.label}</strong>
+                        <span>{row.count}회</span>
+                      </div>
+                      <div className="rate-track">
+                        <span
+                          style={{
+                            width: `${Math.round((row.count / max) * 100)}%`,
+                          }}
+                        />
+                      </div>
+                    </li>
+                  );
+                })}
+              </ul>
+            ) : (
+              <p className="empty-state">아직 기록된 칭찬 태그가 없어요.</p>
+            )}
+          </section>
+
+          <section className="stats-panel">
+            <h2>자주 걸린 방해 요인</h2>
+            <p className="form-help">
+              감점 없는 관찰 기록이에요. 반복되면 선생님과 루틴을 바꿔 볼 수
+              있어요.
+            </p>
+            {struggleTallies.length ? (
+              <ul className="tag-rank tag-rank--struggle" aria-label="방해 요인">
+                {struggleTallies.map((row) => {
+                  const max = struggleTallies[0]?.count || 1;
+                  return (
+                    <li key={row.key}>
+                      <div>
+                        <strong>{row.label}</strong>
+                        <span>{row.count}회</span>
+                      </div>
+                      <div className="rate-track">
+                        <span
+                          style={{
+                            width: `${Math.round((row.count / max) * 100)}%`,
+                          }}
+                        />
+                      </div>
+                    </li>
+                  );
+                })}
+              </ul>
+            ) : (
+              <p className="empty-state">아직 기록된 방해 요인이 없어요.</p>
             )}
           </section>
 
@@ -531,6 +733,8 @@ export default async function StudentSectionPage({
           )}
         </>
       )}
+
+      <StudentTabBar active={activeTab} />
     </AppShell>
   );
 }

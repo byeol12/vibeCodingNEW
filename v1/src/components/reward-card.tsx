@@ -214,7 +214,7 @@ export function RewardCard({
               <strong>
                 {praiseItems.length
                   ? "오늘 내가 잘한 것"
-                  : "내일은 칭찬 태그를 골라봐요"}
+                  : "칭찬 태그를 골라봐요"}
               </strong>
             </div>
             {praiseItems.length > 0 && (

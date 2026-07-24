@@ -1,12 +1,12 @@
 import type { CardGrade } from "./contracts";
 import { POINT_RULES } from "./contracts";
 
-type Session = {
+export type Session = {
   id: string;
   session_date: string;
 };
 
-type Evaluation = {
+export type Evaluation = {
   session_id: string;
   attitude: boolean;
   participation: boolean;

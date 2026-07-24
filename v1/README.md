@@ -15,7 +15,7 @@ npm run dev
 ## 현재 클라우드 연결
 
 - 프로젝트 ref: `bpaulqhnxquanakmlfua`
-- 원격 마이그레이션: `0001`–`0007` 적용 완료
+- 원격 마이그레이션: `0001`–`0008` 적용 필요 (`0008`은 교사 수동 보너스 insert 정책)
 - Email Auth와 Anonymous Sign-Ins 활성화 완료
 - 비로그인 `rooms` 조회 401 차단 확인
 - DB 타입: `src/lib/supabase/database.types.ts`
@@ -41,7 +41,24 @@ npx supabase link --project-ref YOUR_PROJECT_REF
 npx supabase db push
 ```
 
-적용 파일은 `0001`–`0007`이다. 적용 후 비공개 `card-art` 버킷이 생성됐는지 확인한다.
+적용 파일은 `0001`–`0008`이다. 적용 후 비공개 `card-art` 버킷이 생성됐는지 확인한다.
+
+## Vercel 배포
+
+1. Vercel에서 `v1/`을 Root Directory로 연결한다.
+2. Environment Variables에 아래를 넣는다.
+
+| 변수 | 값 |
+| --- | --- |
+| `NEXT_PUBLIC_SUPABASE_URL` | Supabase Project URL |
+| `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | Supabase publishable key |
+| `NEXT_PUBLIC_SITE_URL` | `https://your-app.vercel.app` |
+
+3. Supabase Authentication → URL Configuration에 배포 URL을 Site URL / Redirect URL로 추가한다.
+4. 아직 안 했다면 `npx supabase db push`로 `0001`–`0008` 마이그레이션을 적용한다.
+5. 배포 후 `/join`, 교사 로그인, 학생 입장·카드 저장까지 한 번씩 확인한다.
+
+`vercel.json`은 기본 Next.js 설정으로 충분해 두지 않았다. 필요하면 나중에 리다이렉트·헤더만 추가한다.
 
 ## 통합 확인 순서
 

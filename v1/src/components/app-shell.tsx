@@ -7,6 +7,8 @@ type AppShellProps = {
   title: string;
   description: string;
   children?: ReactNode;
+  /** Replaces the default “함께 성장 중” chip when provided. */
+  headerAccessory?: ReactNode;
 };
 
 export function AppShell({
@@ -14,6 +16,7 @@ export function AppShell({
   title,
   description,
   children,
+  headerAccessory,
 }: AppShellProps) {
   return (
     <main className="shell">
@@ -31,9 +34,11 @@ export function AppShell({
         </Link>
         <div className="shell__tools">
           <ThemeToggle />
-          <span className="status-chip">
-            <span aria-hidden="true">●</span> 함께 성장 중
-          </span>
+          {headerAccessory ?? (
+            <span className="status-chip">
+              <span aria-hidden="true">●</span> 함께 성장 중
+            </span>
+          )}
         </div>
       </header>
       <section className="panel">

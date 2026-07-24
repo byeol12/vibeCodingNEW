@@ -4,6 +4,7 @@ import {
   removeCardArt,
   uploadCardArt,
 } from "@/app/room/[roomId]/art-actions";
+import { awardManualBonus } from "@/app/room/[roomId]/actions";
 import {
   deactivateShopItem,
   decidePurchase,
@@ -473,6 +474,65 @@ export default async function RoomSectionPage({
 
             return (
               <>
+                <section className="section-block">
+                  <div className="section-heading">
+                    <div>
+                      <p className="eyebrow">Manual bonus</p>
+                      <h2>보너스 포인트 지급</h2>
+                    </div>
+                  </div>
+                  <p className="form-help">
+                    성장·회복 보너스와 별도로, 선생님이 직접 1~100P를 줄 수
+                    있습니다.
+                  </p>
+                  {rows.length ? (
+                    <form
+                      className="room-form bonus-form"
+                      action={awardManualBonus.bind(null, roomId)}
+                    >
+                      <label>
+                        학생
+                        <select name="student_id" required defaultValue="">
+                          <option value="" disabled>
+                            선택
+                          </option>
+                          {rows.map((row) => (
+                            <option key={row.student.id} value={row.student.id}>
+                              {row.student.name}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+                      <label>
+                        포인트
+                        <input
+                          type="number"
+                          name="points"
+                          min={1}
+                          max={100}
+                          step={1}
+                          defaultValue={5}
+                          required
+                        />
+                      </label>
+                      <label>
+                        메모 <small>선택</small>
+                        <input
+                          type="text"
+                          name="note"
+                          maxLength={200}
+                          placeholder="예: 발표 보너스"
+                        />
+                      </label>
+                      <SubmitButton pendingLabel="지급 중…">
+                        보너스 지급
+                      </SubmitButton>
+                    </form>
+                  ) : (
+                    <p className="empty-state">승인된 학생이 아직 없습니다.</p>
+                  )}
+                </section>
+
                 <section className="section-block">
                   <div className="section-heading">
                     <div>

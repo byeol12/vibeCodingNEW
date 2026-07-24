@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { Gowun_Dodum, Jua } from "next/font/google";
+import Script from "next/script";
 import { PwaRegister } from "@/components/pwa-register";
 import { themeInitScript } from "@/lib/theme";
 import "./globals.css";
@@ -63,10 +64,12 @@ export default function RootLayout({
       className={`${gowunDodum.variable} ${jua.variable}`}
       suppressHydrationWarning
     >
-      <head>
-        <script dangerouslySetInnerHTML={{ __html: themeInitScript() }} />
-      </head>
       <body>
+        <Script
+          id="theme-init"
+          strategy="beforeInteractive"
+          dangerouslySetInnerHTML={{ __html: themeInitScript() }}
+        />
         {children}
         <PwaRegister />
       </body>

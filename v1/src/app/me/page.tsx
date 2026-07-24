@@ -1,18 +1,19 @@
-import Link from "next/link";
-import { signOut } from "@/app/auth/actions";
-import { applyJoker, saveReflection } from "@/app/me/actions";
+import { applyJoker, saveReflection, saveWeeklyReflection } from "@/app/me/actions";
 import { AppShell } from "@/components/app-shell";
+import { CardCelebrate } from "@/components/card-celebrate";
+import { CardExport } from "@/components/card-export";
+import { RecoveryPrompt } from "@/components/recovery-prompt";
 import { RewardCard } from "@/components/reward-card";
+import { SignOutButton } from "@/components/sign-out-button";
+import { StudentTabBar } from "@/components/student-tab-bar";
 import { SubmitButton } from "@/components/submit-button";
 import { deriveProgress, evaluationCount } from "@/domain/progress";
+import {
+  WEEKLY_HELPFUL_FACTORS,
+  weekStartMonday,
+} from "@/domain/weekly";
 import { requireStudent } from "@/lib/auth/viewer";
 import { createClient } from "@/lib/supabase/server";
-
-const sections = [
-  ["dex", "카드 도감"],
-  ["shop", "보상 상점"],
-  ["stats", "성장 그래프"],
-] as const;
 
 const praiseOptions = [
   ["hand", "🙋 먼저 손 들고 발표"],
@@ -61,6 +62,7 @@ export default async function StudentHomePage({
     { data: reflections },
     { data: jokerBalance },
     { data: bonusPoints },
+    { data: weeklyReflections },
   ] =
     viewer.status === "active"
       ? await Promise.all([
@@ -93,6 +95,11 @@ export default async function StudentHomePage({
           supabase.rpc("student_bonus_points", {
             p_student_id: viewer.studentId,
           }),
+          supabase
+            .from("weekly_reflections")
+            .select("week_start,helpful_factor")
+            .eq("room_id", viewer.roomId)
+            .eq("student_id", viewer.studentId),
         ])
       : [
           { data: null },
@@ -101,10 +108,12 @@ export default async function StudentHomePage({
           { data: [] },
           { data: 0 },
           { data: 0 },
+          { data: [] },
         ];
   const allSessions = sessions || [];
   const allEvaluations = evaluations || [];
   const allReflections = reflections || [];
+  const allWeekly = weeklyReflections || [];
   const currentSession = allSessions.at(-1) || null;
   const currentEvaluation = currentSession
     ? allEvaluations.find(
@@ -116,6 +125,17 @@ export default async function StudentHomePage({
         (reflection) => reflection.session_id === currentSession.id,
       )
     : null;
+  const currentWeekStart = weekStartMonday(today);
+  const weekSessions = allSessions.filter(
+    (session) => weekStartMonday(session.session_date) === currentWeekStart,
+  );
+  const weekLastSession = weekSessions.at(-1) || null;
+  const isWeekClosingDay = weekLastSession?.session_date === today;
+  const currentWeekly = allWeekly.find(
+    (row) => row.week_start === currentWeekStart,
+  );
+  const showWeeklyReflection =
+    weekSessions.length > 0 && (isWeekClosingDay || Boolean(currentWeekly));
   const progress = deriveProgress(
     allSessions,
     allEvaluations,
@@ -162,6 +182,7 @@ export default async function StudentHomePage({
       eyebrow="Student home"
       title={statusCopy.title}
       description={statusCopy.description}
+      headerAccessory={<SignOutButton />}
     >
       {error && (
         <p className="alert alert--error" role="alert">
@@ -202,23 +223,22 @@ export default async function StudentHomePage({
               <strong>{jokers}장</strong>
             </div>
           </div>
-          {(progress.bonusPoints > 0 ||
-            (progress.recovery &&
-              progress.recovery.progress > 0 &&
-              progress.recovery.progress < 3)) && (
+          {progress.bonusPoints > 0 && (
             <p className="form-help bonus-hint">
-              {progress.bonusPoints > 0 && (
-                <>보너스 {progress.bonusPoints}P 포함 · </>
-              )}
-              {progress.recovery && progress.recovery.progress < 3 ? (
-                <>
-                  회복 진행 {progress.recovery.progress}/3일 (완성하면 +10P)
-                </>
-              ) : progress.growthCount > 0 ? (
-                <>성장 보너스 {progress.growthCount}회 반영</>
-              ) : null}
+              보너스 {progress.bonusPoints}P 포함
+              {progress.growthCount > 0
+                ? ` · 성장 보너스 ${progress.growthCount}회 반영`
+                : ""}
             </p>
           )}
+
+          {progress.recovery && progress.recovery.progress < 3 ? (
+            <RecoveryPrompt
+              breakSessionId={progress.recovery.breakSessionId}
+              bestStreak={progress.bestStreak}
+              progress={progress.recovery.progress}
+            />
+          ) : null}
 
           {(jokers > 0 || jokerTargets.length > 0) && (
             <section className="section-block joker-panel">
@@ -273,25 +293,29 @@ export default async function StudentHomePage({
             </div>
           ) : (
             <>
-              <RewardCard
-                sessionDate={currentSession.session_date}
-                grade={currentGrade}
-                points={currentPoints}
-                streak={progress.streakAt[currentSession.id] || progress.currentStreak}
-                attitude={currentEvaluation.attitude}
-                participation={currentEvaluation.participation}
-                homework={currentEvaluation.homework}
-                isLucky={currentEvaluation.is_lucky}
-                jokerUsed={currentEvaluation.joker_used}
-                teacherMemo={currentEvaluation.teacher_memo}
-                praiseTags={currentReflection?.praise_tags || []}
-                studentName={viewer.name}
-                cardIndex={
-                  allSessions.findIndex((session) => session.id === currentSession.id) +
-                  1
-                }
-                totalDays={allSessions.length}
-              />
+              <CardCelebrate sessionId={currentSession.id} enabled>
+                <CardExport fileName={`도장카드_${currentSession.session_date}`}>
+                  <RewardCard
+                    sessionDate={currentSession.session_date}
+                    grade={currentGrade}
+                    points={currentPoints}
+                    streak={progress.streakAt[currentSession.id] || progress.currentStreak}
+                    attitude={currentEvaluation.attitude}
+                    participation={currentEvaluation.participation}
+                    homework={currentEvaluation.homework}
+                    isLucky={currentEvaluation.is_lucky}
+                    jokerUsed={currentEvaluation.joker_used}
+                    teacherMemo={currentEvaluation.teacher_memo}
+                    praiseTags={currentReflection?.praise_tags || []}
+                    studentName={viewer.name}
+                    cardIndex={
+                      allSessions.findIndex((session) => session.id === currentSession.id) +
+                      1
+                    }
+                    totalDays={allSessions.length}
+                  />
+                </CardExport>
+              </CardCelebrate>
 
               <section className="reflection-section">
                 <div className="section-heading">
@@ -350,27 +374,56 @@ export default async function StudentHomePage({
                   </SubmitButton>
                 </form>
               </section>
+
+              {showWeeklyReflection && (
+                <section className="reflection-section weekly-reflection">
+                  <div className="section-heading">
+                    <div>
+                      <p className="eyebrow">Weekly</p>
+                      <h2>이번 주 회고</h2>
+                    </div>
+                    <span className="count-badge">
+                      {currentWeekStart} 주
+                    </span>
+                  </div>
+                  <p className="form-help">
+                    {isWeekClosingDay
+                      ? "이번 주 마지막 수업일이에요. 나를 가장 도와준 걸 골라 보세요."
+                      : "이번 주 회고를 수정할 수 있어요."}
+                  </p>
+                  <form className="reflection-form" action={saveWeeklyReflection}>
+                    <input type="hidden" name="week_start" value={currentWeekStart} />
+                    <fieldset>
+                      <legend>이번 주 나를 가장 도와준 건?</legend>
+                      <div className="reflection-chips reflection-chips--weekly">
+                        {WEEKLY_HELPFUL_FACTORS.map(([value, label]) => (
+                          <label key={value}>
+                            <input
+                              type="radio"
+                              name="helpful"
+                              value={value}
+                              required
+                              defaultChecked={
+                                currentWeekly?.helpful_factor === value
+                              }
+                            />
+                            <span>{label}</span>
+                          </label>
+                        ))}
+                      </div>
+                    </fieldset>
+                    <SubmitButton pendingLabel="회고 저장 중…">
+                      {currentWeekly ? "회고 다시 저장" : "주간 회고 저장"}
+                    </SubmitButton>
+                  </form>
+                </section>
+              )}
             </>
           )}
 
-          <ul className="route-list">
-            {sections.map(([path, label]) => (
-              <li key={path}>
-                <Link href={`/me/${path}`}>
-                  <strong>{label}</strong>
-                  <span>/me/{path}</span>
-                </Link>
-              </li>
-            ))}
-          </ul>
+          <StudentTabBar active="home" />
         </>
       )}
-
-      <form className="actions" action={signOut}>
-        <SubmitButton className="button" pendingLabel="나가는 중…">
-          이 브라우저에서 나가기
-        </SubmitButton>
-      </form>
     </AppShell>
   );
 }

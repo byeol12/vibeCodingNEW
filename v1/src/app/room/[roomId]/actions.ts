@@ -171,3 +171,69 @@ export async function saveEvaluation(
     `/room/${roomId}?session=${sessionId}&message=${encodeURIComponent(message)}`,
   );
 }
+
+export async function awardManualBonus(roomId: string, formData: FormData) {
+  if (!uuidPattern.test(roomId)) {
+    redirect(`/room/${roomId}/report?error=${encodeURIComponent("잘못된 방입니다.")}`);
+  }
+
+  await requireTeacher();
+  const studentId = String(formData.get("student_id") || "");
+  const points = Number(formData.get("points"));
+  const note = String(formData.get("note") || "")
+    .trim()
+    .slice(0, 200);
+
+  if (!uuidPattern.test(studentId)) {
+    redirect(
+      `/room/${roomId}/report?error=${encodeURIComponent("학생을 선택해 주세요.")}`,
+    );
+  }
+  if (!Number.isInteger(points) || points < 1 || points > 100) {
+    redirect(
+      `/room/${roomId}/report?error=${encodeURIComponent("보너스는 1~100P만 가능합니다.")}`,
+    );
+  }
+
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  const { data: student } = await supabase
+    .from("students")
+    .select("id,name")
+    .eq("id", studentId)
+    .eq("room_id", roomId)
+    .eq("status", "active")
+    .maybeSingle();
+
+  if (!student) {
+    redirect(
+      `/room/${roomId}/report?error=${encodeURIComponent("활성 학생만 보너스를 줄 수 있습니다.")}`,
+    );
+  }
+
+  const { error } = await supabase.from("bonus_events").insert({
+    room_id: roomId,
+    student_id: studentId,
+    kind: "manual",
+    points,
+    note,
+    created_by: user?.id ?? null,
+  });
+
+  if (error) {
+    redirect(
+      `/room/${roomId}/report?error=${encodeURIComponent("보너스를 지급하지 못했습니다.")}`,
+    );
+  }
+
+  revalidatePath(`/room/${roomId}/report`);
+  revalidatePath("/me");
+  revalidatePath("/me/shop");
+  redirect(
+    `/room/${roomId}/report?message=${encodeURIComponent(
+      `${student.name} 학생에게 보너스 ${points}P를 지급했습니다.`,
+    )}`,
+  );
+}
