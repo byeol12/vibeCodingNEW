@@ -2134,10 +2134,23 @@
       a.click();
     }
   
+    function exportJSON() {
+      persist();
+      var blob = new Blob([JSON.stringify(state, null, 2)], {
+        type: 'application/json;charset=utf-8;'
+      });
+      var a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = '도장스트릭_v0_' + todayISO() + '.json';
+      a.click();
+      showToast('JSON을 내보냈어요');
+    }
+
     function initActionBar() {
-      var saveBtn = $('#save-btn'), csvBtn = $('#export-csv-btn'), resetBtn = $('#reset-btn');
+      var saveBtn = $('#save-btn'), csvBtn = $('#export-csv-btn'), jsonBtn = $('#export-json-btn'), resetBtn = $('#reset-btn');
       if (saveBtn) saveBtn.addEventListener('click', function () { persist(); showToast('저장했어요'); });
       if (csvBtn) csvBtn.addEventListener('click', exportCSV);
+      if (jsonBtn) jsonBtn.addEventListener('click', exportJSON);
       if (resetBtn) resetBtn.addEventListener('click', function () {
         if (confirm('정말 모든 기록을 초기화할까요? 되돌릴 수 없어요.')) {
           state = defaultState();

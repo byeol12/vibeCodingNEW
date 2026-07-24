@@ -39,7 +39,8 @@ const sectionCopy: Record<string, { title: string; description: string }> = {
   },
   stats: {
     title: "내 성장 그래프",
-    description: "월별 도장, 평가 완료율, 자기관찰 추이를 보여줍니다.",
+    description:
+      "완료율, 등급 분포, 스트릭·월별 도장을 한눈에 보여줍니다.",
   },
 };
 
@@ -67,6 +68,8 @@ export default async function StudentSectionPage({
     { data: shopItems },
     { data: purchases },
     { data: cardArts },
+    { data: bonusPoints },
+    { data: availableBalance },
   ] = await Promise.all([
     supabase
       .from("rooms")
@@ -110,6 +113,14 @@ export default async function StudentSectionPage({
           .select("grade,storage_path")
           .eq("room_id", viewer.roomId)
       : Promise.resolve({ data: [] }),
+    supabase.rpc("student_bonus_points", {
+      p_student_id: viewer.studentId,
+    }),
+    section === "shop"
+      ? supabase.rpc("student_available_balance", {
+          p_student_id: viewer.studentId,
+        })
+      : Promise.resolve({ data: 0 }),
   ]);
   const artUrlByGrade = new Map<string, string>();
   await Promise.all(
@@ -133,6 +144,7 @@ export default async function StudentSectionPage({
     pastSessions,
     allEvaluations,
     allReflections,
+    bonusPoints || 0,
   );
   const cardCount = Object.values(progress.gradeAt).filter(Boolean).length;
   const totalPast = Math.max(1, pastSessions.length);
@@ -143,10 +155,14 @@ export default async function StudentSectionPage({
         100,
     );
   const stamps = allEvaluations.filter(
-    (evaluation) => evaluationCount(evaluation) === 3,
+    (evaluation) =>
+      evaluationCount(evaluation) === 3 || evaluation.joker_used,
   ).length;
   const monthlyStamps = (() => {
-    const byMonth = new Map<string, { label: string; stamps: number; total: number }>();
+    const byMonth = new Map<
+      string,
+      { label: string; stamps: number; total: number }
+    >();
     for (const session of pastSessions) {
       const key = session.session_date.slice(0, 7);
       const entry = byMonth.get(key) || {
@@ -161,7 +177,12 @@ export default async function StudentSectionPage({
       const evaluation = allEvaluations.find(
         (row) => row.session_id === session.id,
       );
-      if (evaluationCount(evaluation) === 3) entry.stamps += 1;
+      if (
+        evaluation &&
+        (evaluationCount(evaluation) === 3 || evaluation.joker_used)
+      ) {
+        entry.stamps += 1;
+      }
       byMonth.set(key, entry);
     }
     return [...byMonth.entries()]
@@ -169,6 +190,35 @@ export default async function StudentSectionPage({
       .map(([, value]) => value)
       .slice(-6);
   })();
+  const gradeOrder = ["C", "U", "R", "E", "L", "J"] as const;
+  const gradeCounts = gradeOrder.map((grade) => ({
+    grade,
+    label: gradeNames[grade],
+    count: Object.values(progress.gradeAt).filter((value) => value === grade)
+      .length,
+  }));
+  const maxGradeCount = Math.max(1, ...gradeCounts.map((row) => row.count));
+  const maxMonthStamps = Math.max(
+    1,
+    ...monthlyStamps.map((month) => month.stamps),
+  );
+  const streakSeries = pastSessions.slice(-12).map((session) => ({
+    id: session.id,
+    date: session.session_date.slice(5),
+    streak: progress.streakAt[session.id] || 0,
+  }));
+  const maxStreakBar = Math.max(
+    1,
+    progress.bestStreak,
+    ...streakSeries.map((row) => row.streak),
+  );
+  const reflectionRate = Math.round(
+    (allReflections.filter((reflection) => reflection.praise_tags.length > 0)
+      .length /
+      totalPast) *
+      100,
+  );
+  const stampRate = Math.round((stamps / totalPast) * 100);
   const spent =
     purchases
       ?.filter((purchase) => purchase.status === "approved")
@@ -177,10 +227,10 @@ export default async function StudentSectionPage({
     purchases
       ?.filter((purchase) => purchase.status === "pending")
       .reduce((sum, purchase) => sum + purchase.price_paid, 0) || 0;
-  const availablePoints = Math.max(
-    0,
-    progress.totalPoints - spent - reserved,
-  );
+  const availablePoints =
+    section === "shop"
+      ? Math.max(0, availableBalance || 0)
+      : Math.max(0, progress.totalPoints - spent - reserved);
   const pendingItemIds = new Set(
     purchases
       ?.filter((purchase) => purchase.status === "pending")
@@ -258,19 +308,23 @@ export default async function StudentSectionPage({
             </div>
             <div>
               <span>완성 도장</span>
-              <strong>{stamps}개</strong>
+              <strong>
+                {stamps}개 · {stampRate}%
+              </strong>
             </div>
             <div>
               <span>최고 스트릭</span>
               <strong>{progress.bestStreak}일</strong>
             </div>
           </div>
+
           <section className="stats-panel">
             <h2>평가 항목 완료율</h2>
             {[
               ["수업 태도", completionRate("attitude")],
               ["수업 참여", completionRate("participation")],
               ["숙제 확인", completionRate("homework")],
+              ["자기관찰(칭찬)", reflectionRate],
             ].map(([label, rate]) => (
               <div className="rate-row" key={String(label)}>
                 <div>
@@ -283,29 +337,110 @@ export default async function StudentSectionPage({
               </div>
             ))}
           </section>
+
+          <section className="stats-panel">
+            <h2>등급별 카드</h2>
+            {cardCount ? (
+              <ul className="grade-bars" aria-label="등급별 카드 수">
+                {gradeCounts.map((row) => (
+                  <li key={row.grade}>
+                    <div
+                      className={`grade-bars__col grade-bars__col--${row.grade}`}
+                      style={{
+                        height: `${Math.max(
+                          8,
+                          Math.round((row.count / maxGradeCount) * 120),
+                        )}px`,
+                      }}
+                      title={`${row.label} ${row.count}장`}
+                    />
+                    <strong>{row.grade}</strong>
+                    <span>{row.count}</span>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="empty-state">아직 획득한 카드가 없어요.</p>
+            )}
+          </section>
+
+          <section className="stats-panel">
+            <h2>최근 스트릭</h2>
+            {streakSeries.length ? (
+              <ul className="streak-bars" aria-label="최근 수업일 스트릭">
+                {streakSeries.map((row) => (
+                  <li key={row.id}>
+                    <div
+                      className="streak-bars__col"
+                      style={{
+                        height: `${Math.max(
+                          6,
+                          Math.round((row.streak / maxStreakBar) * 100),
+                        )}px`,
+                      }}
+                      title={`${row.date} · ${row.streak}일`}
+                    />
+                    <span>{row.date}</span>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="empty-state">아직 집계할 수업일이 없어요.</p>
+            )}
+            <p className="form-help">
+              현재 스트릭 {progress.currentStreak}일 · 최고{" "}
+              {progress.bestStreak}일
+              {progress.recovery
+                ? ` · 회복 ${progress.recovery.progress}/3`
+                : ""}
+            </p>
+          </section>
+
           <section className="stats-panel">
             <h2>월별 도장</h2>
             {monthlyStamps.length ? (
-              <ul className="month-bars">
-                {monthlyStamps.map((month) => {
-                  const rate = month.total
-                    ? Math.round((month.stamps / month.total) * 100)
-                    : 0;
-                  return (
+              <>
+                <ul className="month-cols" aria-label="월별 도장 수">
+                  {monthlyStamps.map((month) => (
                     <li key={month.label}>
-                      <div>
-                        <strong>{month.label}</strong>
-                        <span>
-                          {month.stamps}/{month.total}
-                        </span>
-                      </div>
-                      <div className="rate-track">
-                        <span style={{ width: `${rate}%` }} />
-                      </div>
+                      <div
+                        className="month-cols__col"
+                        style={{
+                          height: `${Math.max(
+                            8,
+                            Math.round(
+                              (month.stamps / maxMonthStamps) * 120,
+                            ),
+                          )}px`,
+                        }}
+                        title={`${month.label} ${month.stamps}/${month.total}`}
+                      />
+                      <strong>{month.label}</strong>
+                      <span>
+                        {month.stamps}/{month.total}
+                      </span>
                     </li>
-                  );
-                })}
-              </ul>
+                  ))}
+                </ul>
+                <ul className="month-bars">
+                  {monthlyStamps.map((month) => {
+                    const rate = month.total
+                      ? Math.round((month.stamps / month.total) * 100)
+                      : 0;
+                    return (
+                      <li key={`${month.label}-rate`}>
+                        <div>
+                          <strong>{month.label} 달성률</strong>
+                          <span>{rate}%</span>
+                        </div>
+                        <div className="rate-track">
+                          <span style={{ width: `${rate}%` }} />
+                        </div>
+                      </li>
+                    );
+                  })}
+                </ul>
+              </>
             ) : (
               <p className="empty-state">아직 집계할 수업일이 없어요.</p>
             )}

@@ -76,7 +76,7 @@ export async function saveEvaluation(
         .maybeSingle(),
       supabase
         .from("evaluations")
-        .select("attitude,participation,homework,is_lucky")
+        .select("attitude,participation,homework,is_lucky,joker_used")
         .eq("session_id", sessionId)
         .eq("student_id", studentId)
         .maybeSingle(),
@@ -89,6 +89,7 @@ export async function saveEvaluation(
   const attitude = formData.get("attitude") === "on";
   const participation = formData.get("participation") === "on";
   const homework = formData.get("homework") === "on";
+  const wantJoker = formData.get("jokerUsed") === "on";
   const teacherMemo = String(formData.get("teacherMemo") || "")
     .trim()
     .slice(0, 1000);
@@ -98,6 +99,11 @@ export async function saveEvaluation(
   );
   const isLucky =
     existing?.is_lucky || (completed && !wasCompleted && randomInt(10) === 0);
+  const itemCount =
+    Number(attitude) + Number(participation) + Number(homework);
+
+  // 조커는 원장 RPC로만 켜고 끈다. 평가 저장은 기존 사용 상태를 유지한다.
+  const jokerUsed = Boolean(existing?.joker_used);
 
   const { error } = await supabase.from("evaluations").upsert(
     {
@@ -109,6 +115,7 @@ export async function saveEvaluation(
       participation,
       homework,
       is_lucky: isLucky,
+      joker_used: jokerUsed,
       teacher_memo: teacherMemo,
       updated_at: new Date().toISOString(),
     },
@@ -121,9 +128,45 @@ export async function saveEvaluation(
     );
   }
 
+  if (wantJoker && !jokerUsed && itemCount >= 1 && itemCount <= 2) {
+    const { error: jokerError } = await supabase.rpc("apply_joker", {
+      p_session_id: sessionId,
+      p_student_id: studentId,
+    });
+    if (jokerError) {
+      redirect(
+        `/room/${roomId}?session=${sessionId}&error=${encodeURIComponent(
+          jokerError.message.toLowerCase().includes("no joker")
+            ? "보유한 조커가 없어 적용하지 못했습니다. 평가는 저장됐어요."
+            : "조커를 적용하지 못했습니다. 평가는 저장됐어요.",
+        )}`,
+      );
+    }
+  } else if (!wantJoker && jokerUsed) {
+    const { error: refundError } = await supabase.rpc("refund_joker", {
+      p_session_id: sessionId,
+      p_student_id: studentId,
+    });
+    if (refundError) {
+      redirect(
+        `/room/${roomId}?session=${sessionId}&error=${encodeURIComponent(
+          "조커 취소를 반영하지 못했습니다. 평가는 저장됐어요.",
+        )}`,
+      );
+    }
+  }
+
+  await supabase.rpc("sync_joker_awards", { p_student_id: studentId });
+  await supabase.rpc("sync_bonus_awards", { p_student_id: studentId });
+
   revalidatePath(`/room/${roomId}`);
   revalidatePath("/me");
-  const message = isLucky && !existing?.is_lucky ? "럭키 카드 평가를 저장했습니다." : "수업 평가를 저장했습니다.";
+  revalidatePath(`/me/shop`);
+  revalidatePath(`/room/${roomId}/report`);
+  const message =
+    isLucky && !existing?.is_lucky
+      ? "럭키 카드 평가를 저장했습니다."
+      : "수업 평가를 저장했습니다.";
   redirect(
     `/room/${roomId}?session=${sessionId}&message=${encodeURIComponent(message)}`,
   );

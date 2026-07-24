@@ -6,7 +6,7 @@ export default function JoinPage() {
     <AppShell
       eyebrow="Student"
       title="방 코드로 입장"
-      description="선생님에게 받은 6자리 코드와 이름만 입력하세요."
+      description="선생님에게 받은 6자리 코드와 이름만 입력하세요. 입장 후 학생 홈(/me)으로 이동합니다."
     >
       <StudentJoinForm />
     </AppShell>

@@ -80,7 +80,7 @@ export default async function RoomPage({
     ? await supabase
         .from("evaluations")
         .select(
-          "student_id,attitude,participation,homework,is_lucky,teacher_memo",
+          "student_id,attitude,participation,homework,is_lucky,joker_used,teacher_memo",
         )
         .eq("room_id", roomId)
         .eq("session_id", selectedSession.id)
@@ -220,6 +220,14 @@ export default async function RoomPage({
                       </label>
                     ))}
                   </div>
+                  <label className="check-inline joker-toggle">
+                    <input
+                      name="jokerUsed"
+                      type="checkbox"
+                      defaultChecked={Boolean(evaluation?.joker_used)}
+                    />
+                    <span>🃏 조커로 이 날 봐주기 (체크 1~2개 날만)</span>
+                  </label>
                   <label className="field">
                     <span>선생님 한마디</span>
                     <textarea

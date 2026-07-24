@@ -23,7 +23,7 @@
 | `perfectWeeks`, `bestStreak` | 저장하지 않음 | 평가 기록에서 재계산 |
 | `frame`, `frameOwned` | 이식하지 않음 | v1은 등급별 자동 프레임 |
 
-`jokers`, `recoveryAwards`, `bonusPoints`는 일일 평가만으로 복원할 수 없다. 실제 가져오기 기능 전에 `bonus_events`와 `joker_events` 원장을 추가하고, 원본 이벤트와 수동 보너스를 감사 가능한 행으로 이식한다.
+`jokers`, `recoveryAwards`, `bonusPoints`는 일일 평가만으로 복원할 수 없다. `bonus_events`와 `joker_events` 원장에 원본 이벤트와 수동 보너스를 감사 가능한 행으로 이식한다.
 
 ## 코드 이식 위치
 
@@ -40,3 +40,10 @@
 3. 학생, 평가, 자기관찰, 구매, 이미지 건수를 미리 보여준다.
 4. 교사 확인 후 하나의 서버 작업으로 가져온다.
 5. 성공·실패 행과 제외 사유를 다운로드 가능한 결과로 남긴다.
+
+## v1 UI
+
+- 경로: `/dashboard/import`
+- v0의 “JSON 내보내기”로 만든 파일을 올린다.
+- 활성 학생을 고른 뒤 미리보기를 확인하고 가져온다.
+- 프레임 상점 항목·주간 성찰(`helpful_factor` 불일치)은 이 단계에서 제외한다.

@@ -50,11 +50,16 @@ export default async function DashboardPage({
       title={`${profile?.display_name || "선생님"}의 수업 방`}
       description="수업 일정을 입력하면 전체 수업일과 학생 입장 코드가 함께 만들어집니다."
     >
-      <form className="inline-logout" action={signOut}>
-        <SubmitButton className="button" pendingLabel="로그아웃 중…">
-          로그아웃
-        </SubmitButton>
-      </form>
+      <div className="actions">
+        <Link className="button" href="/dashboard/import">
+          v0 가져오기
+        </Link>
+        <form className="inline-logout" action={signOut}>
+          <SubmitButton className="button" pendingLabel="로그아웃 중…">
+            로그아웃
+          </SubmitButton>
+        </form>
+      </div>
 
       {error && (
         <p className="alert alert--error" role="alert">

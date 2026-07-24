@@ -39,6 +39,67 @@ export type Database = {
   }
   public: {
     Tables: {
+      bonus_events: {
+        Row: {
+          break_session_id: string | null
+          created_at: string
+          created_by: string | null
+          id: string
+          kind: Database["public"]["Enums"]["bonus_kind"]
+          month_key: string | null
+          note: string
+          points: number
+          room_id: string
+          student_id: string
+        }
+        Insert: {
+          break_session_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          kind: Database["public"]["Enums"]["bonus_kind"]
+          month_key?: string | null
+          note?: string
+          points: number
+          room_id: string
+          student_id: string
+        }
+        Update: {
+          break_session_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          kind?: Database["public"]["Enums"]["bonus_kind"]
+          month_key?: string | null
+          note?: string
+          points?: number
+          room_id?: string
+          student_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "bonus_events_break_session_id_room_id_fkey"
+            columns: ["break_session_id", "room_id"]
+            isOneToOne: false
+            referencedRelation: "sessions"
+            referencedColumns: ["id", "room_id"]
+          },
+          {
+            foreignKeyName: "bonus_events_room_id_fkey"
+            columns: ["room_id"]
+            isOneToOne: false
+            referencedRelation: "rooms"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "bonus_events_student_id_room_id_fkey"
+            columns: ["student_id", "room_id"]
+            isOneToOne: false
+            referencedRelation: "students"
+            referencedColumns: ["id", "room_id"]
+          },
+        ]
+      }
       card_arts: {
         Row: {
           created_at: string
@@ -144,6 +205,77 @@ export type Database = {
           },
           {
             foreignKeyName: "evaluations_student_id_room_id_fkey"
+            columns: ["student_id", "room_id"]
+            isOneToOne: false
+            referencedRelation: "students"
+            referencedColumns: ["id", "room_id"]
+          },
+        ]
+      }
+      joker_events: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          delta: number
+          id: string
+          note: string
+          purchase_id: string | null
+          room_id: string
+          session_id: string | null
+          source: Database["public"]["Enums"]["joker_source"]
+          student_id: string
+          week_key: string | null
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          delta: number
+          id?: string
+          note?: string
+          purchase_id?: string | null
+          room_id: string
+          session_id?: string | null
+          source: Database["public"]["Enums"]["joker_source"]
+          student_id: string
+          week_key?: string | null
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          delta?: number
+          id?: string
+          note?: string
+          purchase_id?: string | null
+          room_id?: string
+          session_id?: string | null
+          source?: Database["public"]["Enums"]["joker_source"]
+          student_id?: string
+          week_key?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "joker_events_purchase_id_fkey"
+            columns: ["purchase_id"]
+            isOneToOne: false
+            referencedRelation: "purchases"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "joker_events_room_id_fkey"
+            columns: ["room_id"]
+            isOneToOne: false
+            referencedRelation: "rooms"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "joker_events_session_id_room_id_fkey"
+            columns: ["session_id", "room_id"]
+            isOneToOne: false
+            referencedRelation: "sessions"
+            referencedColumns: ["id", "room_id"]
+          },
+          {
+            foreignKeyName: "joker_events_student_id_room_id_fkey"
             columns: ["student_id", "room_id"]
             isOneToOne: false
             referencedRelation: "students"
@@ -378,6 +510,7 @@ export type Database = {
         Row: {
           created_at: string
           description: string
+          effect: string | null
           icon: string
           id: string
           is_active: boolean
@@ -393,6 +526,7 @@ export type Database = {
         Insert: {
           created_at?: string
           description?: string
+          effect?: string | null
           icon?: string
           id?: string
           is_active?: boolean
@@ -408,6 +542,7 @@ export type Database = {
         Update: {
           created_at?: string
           description?: string
+          effect?: string | null
           icon?: string
           id?: string
           is_active?: boolean
@@ -549,6 +684,30 @@ export type Database = {
       }
     }
     Functions: {
+      apply_joker: {
+        Args: { p_session_id: string; p_student_id: string }
+        Returns: {
+          attitude: boolean
+          evaluated_at: string
+          evaluated_by: string
+          homework: boolean
+          id: string
+          is_lucky: boolean
+          joker_used: boolean
+          participation: boolean
+          room_id: string
+          session_id: string
+          student_id: string
+          teacher_memo: string
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "evaluations"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       create_room_with_sessions: {
         Args: {
           p_end_date: string
@@ -600,6 +759,30 @@ export type Database = {
         }
       }
       make_join_code: { Args: never; Returns: string }
+      refund_joker: {
+        Args: { p_session_id: string; p_student_id: string }
+        Returns: {
+          attitude: boolean
+          evaluated_at: string
+          evaluated_by: string
+          homework: boolean
+          id: string
+          is_lucky: boolean
+          joker_used: boolean
+          participation: boolean
+          room_id: string
+          session_id: string
+          student_id: string
+          teacher_memo: string
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "evaluations"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       request_purchase: {
         Args: { p_item_id: string }
         Returns: {
@@ -625,9 +808,24 @@ export type Database = {
         Returns: undefined
       }
       storage_room_id: { Args: { object_name: string }; Returns: string }
+      student_available_balance: {
+        Args: { p_student_id: string }
+        Returns: number
+      }
+      student_bonus_points: { Args: { p_student_id: string }; Returns: number }
+      student_joker_balance: { Args: { p_student_id: string }; Returns: number }
+      sync_bonus_awards: { Args: { p_student_id: string }; Returns: number }
+      sync_joker_awards: { Args: { p_student_id: string }; Returns: number }
     }
     Enums: {
+      bonus_kind: "growth" | "recovery" | "manual"
       card_grade: "C" | "U" | "R" | "E" | "L" | "J"
+      joker_source:
+        | "homework_streak"
+        | "perfect_week"
+        | "shop"
+        | "session_use"
+        | "manual"
       purchase_status: "pending" | "approved" | "rejected" | "refunded"
       student_status: "pending" | "active" | "revoked"
     }
@@ -760,7 +958,15 @@ export const Constants = {
   },
   public: {
     Enums: {
+      bonus_kind: ["growth", "recovery", "manual"],
       card_grade: ["C", "U", "R", "E", "L", "J"],
+      joker_source: [
+        "homework_streak",
+        "perfect_week",
+        "shop",
+        "session_use",
+        "manual",
+      ],
       purchase_status: ["pending", "approved", "rejected", "refunded"],
       student_status: ["pending", "active", "revoked"],
     },

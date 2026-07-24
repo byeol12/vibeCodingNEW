@@ -44,7 +44,7 @@ const sectionCopy: Record<string, { title: string; description: string }> = {
   },
   report: {
     title: "학생 진척도",
-    description: "평가, 스트릭, 자기관찰 데이터를 집계해 보여줍니다.",
+    description: "방 전체 요약 차트와 학생별 도장·포인트·스트릭을 보여줍니다.",
   },
   approve: {
     title: "보상 승인",
@@ -88,6 +88,8 @@ export default async function RoomSectionPage({
     { data: evaluations },
     { data: reflections },
     { data: cardArts },
+    { data: jokerEvents },
+    { data: bonusEvents },
   ] = await Promise.all([
     section === "shop"
       ? supabase
@@ -145,6 +147,18 @@ export default async function RoomSectionPage({
           .select("id,grade,storage_path,updated_at")
           .eq("room_id", roomId)
           .order("grade")
+      : Promise.resolve({ data: [] }),
+    section === "report"
+      ? supabase
+          .from("joker_events")
+          .select("student_id,delta")
+          .eq("room_id", roomId)
+      : Promise.resolve({ data: [] }),
+    section === "report"
+      ? supabase
+          .from("bonus_events")
+          .select("student_id,points")
+          .eq("room_id", roomId)
       : Promise.resolve({ data: [] }),
   ]);
 
@@ -393,17 +407,11 @@ export default async function RoomSectionPage({
       )}
 
       {section === "report" && (
-        <section className="section-block">
-          <div className="section-heading">
-            <div>
-              <p className="eyebrow">Progress</p>
-              <h2>학생별 요약</h2>
-            </div>
-            <span className="count-badge">{students?.length || 0}명</span>
-          </div>
-          {students?.length ? (
-            <ul className="report-list">
-              {students.map((student) => {
+        <>
+          {(() => {
+            const sessionCount = Math.max(1, sessions?.length || 0);
+            const rows =
+              students?.map((student) => {
                 const studentEvals =
                   evaluations?.filter(
                     (evaluation) => evaluation.student_id === student.id,
@@ -417,34 +425,143 @@ export default async function RoomSectionPage({
                       session_id: reflection.session_id,
                       praise_tags: reflection.praise_tags,
                     })) || [];
+                const jokers = Math.max(
+                  0,
+                  (jokerEvents || [])
+                    .filter((event) => event.student_id === student.id)
+                    .reduce((sum, event) => sum + event.delta, 0),
+                );
+                const bonuses = (bonusEvents || [])
+                  .filter((event) => event.student_id === student.id)
+                  .reduce((sum, event) => sum + event.points, 0);
                 const progress = deriveProgress(
                   sessions || [],
                   studentEvals,
                   studentReflections,
+                  bonuses,
                 );
                 const stamps = studentEvals.filter(
-                  (evaluation) => evaluationCount(evaluation) === 3,
+                  (evaluation) =>
+                    evaluationCount(evaluation) === 3 || evaluation.joker_used,
                 ).length;
-                return (
-                  <li key={student.id}>
+                return {
+                  student,
+                  progress,
+                  stamps,
+                  jokers,
+                  stampRate: Math.round((stamps / sessionCount) * 100),
+                };
+              }) || [];
+            const avgStampRate = rows.length
+              ? Math.round(
+                  rows.reduce((sum, row) => sum + row.stampRate, 0) /
+                    rows.length,
+                )
+              : 0;
+            const totalPoints = rows.reduce(
+              (sum, row) => sum + row.progress.totalPoints,
+              0,
+            );
+            const bestStreak = rows.reduce(
+              (max, row) => Math.max(max, row.progress.bestStreak),
+              0,
+            );
+            const maxStampRate = Math.max(
+              1,
+              ...rows.map((row) => row.stampRate),
+            );
+
+            return (
+              <>
+                <section className="section-block">
+                  <div className="section-heading">
                     <div>
-                      <strong>{student.name}</strong>
-                      <span>
-                        도장 {stamps} · 포인트 {progress.totalPoints}P · 최고
-                        스트릭 {progress.bestStreak}일
-                      </span>
+                      <p className="eyebrow">Overview</p>
+                      <h2>방 전체 요약</h2>
                     </div>
-                    <span className="count-badge">
-                      현재 {progress.currentStreak}일
-                    </span>
-                  </li>
-                );
-              })}
-            </ul>
-          ) : (
-            <p className="empty-state">승인된 학생이 아직 없습니다.</p>
-          )}
-        </section>
+                    <span className="count-badge">{rows.length}명</span>
+                  </div>
+                  {rows.length ? (
+                    <>
+                      <div className="student-summary stats-summary">
+                        <div>
+                          <span>평균 도장률</span>
+                          <strong>{avgStampRate}%</strong>
+                        </div>
+                        <div>
+                          <span>총 포인트</span>
+                          <strong>{totalPoints}P</strong>
+                        </div>
+                        <div>
+                          <span>최고 스트릭</span>
+                          <strong>{bestStreak}일</strong>
+                        </div>
+                      </div>
+                      <ul
+                        className="report-chart"
+                        aria-label="학생별 도장 달성률"
+                      >
+                        {rows.map((row) => (
+                          <li key={row.student.id}>
+                            <div
+                              className="report-chart__col"
+                              style={{
+                                height: `${Math.max(
+                                  8,
+                                  Math.round(
+                                    (row.stampRate / maxStampRate) * 120,
+                                  ),
+                                )}px`,
+                              }}
+                              title={`${row.student.name} ${row.stampRate}%`}
+                            />
+                            <strong>{row.student.name}</strong>
+                            <span>{row.stampRate}%</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </>
+                  ) : (
+                    <p className="empty-state">승인된 학생이 아직 없습니다.</p>
+                  )}
+                </section>
+
+                <section className="section-block">
+                  <div className="section-heading">
+                    <div>
+                      <p className="eyebrow">Progress</p>
+                      <h2>학생별 요약</h2>
+                    </div>
+                  </div>
+                  {rows.length ? (
+                    <ul className="report-list">
+                      {rows.map((row) => (
+                        <li key={row.student.id}>
+                          <div>
+                            <strong>{row.student.name}</strong>
+                            <span>
+                              도장 {row.stamps} · 포인트{" "}
+                              {row.progress.totalPoints}P · 조커 {row.jokers}장
+                              · 최고 스트릭 {row.progress.bestStreak}일
+                            </span>
+                            <div className="rate-track report-list__track">
+                              <span style={{ width: `${row.stampRate}%` }} />
+                            </div>
+                          </div>
+                          <span className="count-badge">
+                            현재 {row.progress.currentStreak}일
+                          </span>
+                        </li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <p className="empty-state">승인된 학생이 아직 없습니다.</p>
+                  )}
+                </section>
+              </>
+            );
+          })()}
+        </>
       )}
 
       {section === "art" && (

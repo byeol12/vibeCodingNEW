@@ -1331,6 +1331,81 @@ button:disabled {
   font-size: 0.9rem;
 }
 
+.joker-toggle {
+  margin: 4px 0 10px;
+  font-size: 0.95rem;
+}
+
+.import-form {
+  gap: 16px;
+}
+
+.import-preview {
+  border: 2px dashed var(--line);
+  border-radius: 22px;
+  background: #fffaf6;
+  padding: 16px 18px;
+}
+
+.import-preview h2 {
+  margin: 0 0 10px;
+  font-family: var(--font-jua), sans-serif;
+  font-size: 1.25rem;
+  font-weight: 400;
+}
+
+.import-preview ul {
+  margin: 0;
+  padding-left: 1.1rem;
+  display: grid;
+  gap: 6px;
+  color: var(--muted);
+}
+
+.import-steps {
+  margin: 0;
+  padding-left: 1.2rem;
+  display: grid;
+  gap: 8px;
+  color: var(--muted);
+  line-height: 1.6;
+}
+
+.joker-panel .form-help {
+  margin-top: 0;
+}
+
+.joker-target-list {
+  display: grid;
+  gap: 12px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.joker-target-list li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  border: 2px solid var(--line);
+  border-radius: 20px;
+  background: #fff;
+  padding: 14px 16px;
+  box-shadow: 0 5px 0 #eee7f3;
+}
+
+.joker-target-list strong,
+.joker-target-list span {
+  display: block;
+}
+
+.joker-target-list span {
+  margin-top: 4px;
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
 .dex-card__art {
   width: 100%;
   aspect-ratio: 1;
@@ -1341,7 +1416,7 @@ button:disabled {
 .month-bars {
   display: grid;
   gap: 14px;
-  margin: 0;
+  margin: 18px 0 0;
   padding: 0;
   list-style: none;
 }
@@ -1351,6 +1426,81 @@ button:disabled {
   justify-content: space-between;
   gap: 12px;
   margin-bottom: 8px;
+}
+
+.grade-bars,
+.streak-bars,
+.month-cols,
+.report-chart {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(44px, 1fr));
+  align-items: end;
+  gap: 10px;
+  margin: 8px 0 0;
+  padding: 0;
+  list-style: none;
+  min-height: 150px;
+}
+
+.grade-bars li,
+.streak-bars li,
+.month-cols li,
+.report-chart li {
+  display: grid;
+  justify-items: center;
+  align-content: end;
+  gap: 6px;
+}
+
+.grade-bars__col,
+.streak-bars__col,
+.month-cols__col,
+.report-chart__col {
+  width: 100%;
+  max-width: 36px;
+  border-radius: 14px 14px 8px 8px;
+  background: linear-gradient(180deg, #f7b4d2 0%, #c9a8ef 100%);
+  box-shadow: inset 0 -3px 0 rgba(0, 0, 0, 0.06);
+}
+
+.grade-bars__col--C {
+  background: linear-gradient(180deg, #d7dde8, #b7c0cf);
+}
+.grade-bars__col--U {
+  background: linear-gradient(180deg, #b7e3c8, #7fc8a0);
+}
+.grade-bars__col--R {
+  background: linear-gradient(180deg, #9ec9ff, #6ea0ef);
+}
+.grade-bars__col--E {
+  background: linear-gradient(180deg, #d2b4ff, #a57aef);
+}
+.grade-bars__col--L {
+  background: linear-gradient(180deg, #ffd28a, #f0a84a);
+}
+.grade-bars__col--J {
+  background: linear-gradient(180deg, #ff9ec4, #c48bff);
+}
+
+.grade-bars strong,
+.month-cols strong,
+.report-chart strong {
+  font-family: var(--font-jua), sans-serif;
+  font-size: 0.95rem;
+  font-weight: 400;
+}
+
+.grade-bars span,
+.streak-bars span,
+.month-cols span,
+.report-chart span {
+  color: var(--muted);
+  font-size: 0.78rem;
+}
+
+.report-list__track {
+  margin-top: 10px;
+  max-width: 280px;
 }
 
 @media (hover: hover) {

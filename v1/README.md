@@ -1,6 +1,6 @@
 # 도장 스트릭 v1
 
-Next.js 16.2 App Router, TypeScript, Tailwind CSS, Supabase로 구성한 v1 프로젝트다. 현재 교사 인증, 방·수업일 생성, 학생 익명 입장과 승인, 일일 평가, 자기관찰, 포인트·등급 카드, 보상 상점·구매·승인, 카드 아트 업로드까지 구현되어 있다.
+Next.js 16.2 App Router, TypeScript, Tailwind CSS, Supabase로 구성한 v1 프로젝트다. 현재 교사 인증, 방·수업일 생성, 학생 익명 입장과 승인, 일일 평가, 자기관찰, 포인트·등급 카드, 보상 상점·구매·승인, 카드 아트, 조커·보너스 원장, 차트, PWA 설치까지 구현되어 있다.
 
 ## 로컬 실행
 
@@ -15,7 +15,7 @@ npm run dev
 ## 현재 클라우드 연결
 
 - 프로젝트 ref: `bpaulqhnxquanakmlfua`
-- 원격 마이그레이션: `0001`–`0004` 적용 완료
+- 원격 마이그레이션: `0001`–`0007` 적용 완료
 - Email Auth와 Anonymous Sign-Ins 활성화 완료
 - 비로그인 `rooms` 조회 401 차단 확인
 - DB 타입: `src/lib/supabase/database.types.ts`
@@ -41,7 +41,7 @@ npx supabase link --project-ref YOUR_PROJECT_REF
 npx supabase db push
 ```
 
-적용 파일은 `0001_schema.sql`, `0002_rls.sql`, `0003_auth_and_rooms.sql`, `0004_shop_and_purchases.sql`이다. 적용 후 비공개 `card-art` 버킷이 생성됐는지 확인한다.
+적용 파일은 `0001`–`0007`이다. 적용 후 비공개 `card-art` 버킷이 생성됐는지 확인한다.
 
 ## 통합 확인 순서
 
@@ -53,6 +53,10 @@ npx supabase db push
 6. 교사 방의 상점에 기본 보상이 없으면 `기본 보상 채우기`를 실행한다.
 7. 학생이 포인트로 구매 요청 → 교사 `/room/.../approve`에서 승인·거절을 확인한다.
 8. 다른 교사 계정에서 해당 방 URL과 데이터를 볼 수 없는지 확인한다.
+
+## PWA
+
+프로덕션(`npm run build && npm start`)에서 서비스 워커가 등록된다. 모바일 브라우저에서 ‘홈 화면에 추가’로 설치할 수 있다. 오프라인일 때는 캐시된 셸과 `/offline.html`을 보여 주며, 실시간 평가·구매 데이터는 온라인에서만 갱신된다.
 
 ## 검사
 

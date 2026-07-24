@@ -32,7 +32,8 @@ flowchart LR
 1. `proxy.ts`는 세션 쿠키를 갱신하고 보호 경로의 무세션 접근을 돌려보낸다.
 2. Server Component는 `requireTeacher()` 또는 `requireStudent()`로 실제 JWT와 DB 역할을 다시 확인한다.
 3. 모든 데이터 접근은 RLS를 최종 권한 경계로 사용한다.
-4. 구매 한도·중복 pending은 `request_purchase` RPC에서 검사한다. 잔액은 서버 액션에서 평가·구매 내역으로 계산한 뒤 RPC를 호출한다(잔액 원자 검사는 후속 강화).
+4. 구매 한도·중복 pending·잔액은 `request_purchase` RPC에서 학생 행을 잠근 뒤 원자적으로 검사한다. 잔액은 일일 기본 포인트 + `bonus_events` − (승인+대기 구매)다.
+5. 조커·성장·회복 보너스는 각각 `joker_events` / `bonus_events` 원장과 sync RPC로 적재한다.
 
 ## Storage 경로
 
@@ -40,4 +41,4 @@ flowchart LR
 
 ## 현재 구현 경계
 
-`교사 가입·로그인 → 방 생성 → 수업일 생성 → 학생 코드 입장 → 교사 승인 → 일일 3항목 평가 → 학생 자기관찰 → 등급 카드 → 상점 편집·구매·승인·진척 리포트 → 카드 아트 업로드`까지 연결되어 있다. 다음 구현 단위는 잔액 원자 RPC, 조커 원장, 차트·PWA다.
+`교사 가입·로그인 → … → PWA 설치 → v0 JSON 가져오기`까지 연결되어 있다.

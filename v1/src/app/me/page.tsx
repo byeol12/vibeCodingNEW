@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { signOut } from "@/app/auth/actions";
-import { saveReflection } from "@/app/me/actions";
+import { applyJoker, saveReflection } from "@/app/me/actions";
 import { AppShell } from "@/components/app-shell";
 import { SubmitButton } from "@/components/submit-button";
 import { deriveProgress, evaluationCount } from "@/domain/progress";
@@ -67,6 +67,8 @@ export default async function StudentHomePage({
     { data: sessions },
     { data: evaluations },
     { data: reflections },
+    { data: jokerBalance },
+    { data: bonusPoints },
   ] =
     viewer.status === "active"
       ? await Promise.all([
@@ -93,12 +95,20 @@ export default async function StudentHomePage({
             .select("session_id,praise_tags,struggle_tags")
             .eq("room_id", viewer.roomId)
             .eq("student_id", viewer.studentId),
+          supabase.rpc("student_joker_balance", {
+            p_student_id: viewer.studentId,
+          }),
+          supabase.rpc("student_bonus_points", {
+            p_student_id: viewer.studentId,
+          }),
         ])
       : [
           { data: null },
           { data: [] },
           { data: [] },
           { data: [] },
+          { data: 0 },
+          { data: 0 },
         ];
   const allSessions = sessions || [];
   const allEvaluations = evaluations || [];
@@ -118,6 +128,7 @@ export default async function StudentHomePage({
     allSessions,
     allEvaluations,
     allReflections,
+    bonusPoints || 0,
   );
   const currentGrade = currentSession
     ? progress.gradeAt[currentSession.id]
@@ -126,6 +137,18 @@ export default async function StudentHomePage({
     ? progress.pointsAt[currentSession.id] || 0
     : 0;
   const evaluatedCount = evaluationCount(currentEvaluation);
+  const jokers = Math.max(0, jokerBalance || 0);
+  const jokerTargets = allSessions
+    .filter((session) => {
+      const evaluation = allEvaluations.find(
+        (row) => row.session_id === session.id,
+      );
+      const count = evaluationCount(evaluation);
+      return Boolean(
+        evaluation && !evaluation.joker_used && count >= 1 && count <= 2,
+      );
+    })
+    .slice(-5);
 
   const statusCopy = {
     pending: {
@@ -183,10 +206,66 @@ export default async function StudentHomePage({
               <strong>{progress.currentStreak}일</strong>
             </div>
             <div>
-              <span>최고 스트릭</span>
-              <strong>{progress.bestStreak}일</strong>
+              <span>조커 카드</span>
+              <strong>{jokers}장</strong>
             </div>
           </div>
+          {(progress.bonusPoints > 0 ||
+            (progress.recovery &&
+              progress.recovery.progress > 0 &&
+              progress.recovery.progress < 3)) && (
+            <p className="form-help bonus-hint">
+              {progress.bonusPoints > 0 && (
+                <>보너스 {progress.bonusPoints}P 포함 · </>
+              )}
+              {progress.recovery && progress.recovery.progress < 3 ? (
+                <>
+                  회복 진행 {progress.recovery.progress}/3일 (완성하면 +10P)
+                </>
+              ) : progress.growthCount > 0 ? (
+                <>성장 보너스 {progress.growthCount}회 반영</>
+              ) : null}
+            </p>
+          )}
+
+          {(jokers > 0 || jokerTargets.length > 0) && (
+            <section className="section-block joker-panel">
+              <div className="section-heading">
+                <div>
+                  <p className="eyebrow">Joker</p>
+                  <h2>조커 카드</h2>
+                </div>
+                <span className="count-badge">보유 {jokers}장</span>
+              </div>
+              <p className="form-help">
+                체크가 1~2개만 있는 날에 쓰면 그날을 도장으로 이어 줘요. 숙제
+                3연속·퍼펙트 위크·상점에서 얻을 수 있어요.
+              </p>
+              {jokers > 0 && jokerTargets.length ? (
+                <ul className="joker-target-list">
+                  {jokerTargets.map((session) => (
+                    <li key={session.id}>
+                      <div>
+                        <strong>{session.session_date}</strong>
+                        <span>부분 체크 날 · 조커 사용 가능</span>
+                      </div>
+                      <form action={applyJoker.bind(null, session.id)}>
+                        <SubmitButton pendingLabel="사용 중…">
+                          이 날에 쓰기
+                        </SubmitButton>
+                      </form>
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <p className="empty-state">
+                  {jokers > 0
+                    ? "지금은 조커를 쓸 수 있는 부분 체크 날이 없어요."
+                    : "조건을 달성하거나 상점에서 조커를 모아 보세요."}
+                </p>
+              )}
+            </section>
+          )}
 
           {!currentSession ? (
             <p className="empty-state">아직 시작된 수업일이 없습니다.</p>
@@ -221,6 +300,7 @@ export default async function StudentHomePage({
                   {currentEvaluation.attitude && <li>✓ 수업 태도</li>}
                   {currentEvaluation.participation && <li>✓ 수업 참여</li>}
                   {currentEvaluation.homework && <li>✓ 숙제 확인</li>}
+                  {currentEvaluation.joker_used && <li>🃏 조커 사용</li>}
                 </ul>
                 {currentEvaluation.teacher_memo && (
                   <blockquote>

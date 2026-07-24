@@ -74,3 +74,33 @@ export async function saveReflection(sessionId: string, formData: FormData) {
   revalidatePath("/me");
   redirect(`/me?message=${encodeURIComponent("오늘의 자기관찰을 저장했습니다.")}`);
 }
+
+export async function applyJoker(sessionId: string, _formData: FormData) {
+  void _formData;
+  if (!uuidPattern.test(sessionId)) {
+    redirect(`/me?error=${encodeURIComponent("잘못된 수업일입니다.")}`);
+  }
+
+  const viewer = await requireActiveStudent();
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("apply_joker", {
+    p_session_id: sessionId,
+    p_student_id: viewer.studentId,
+  });
+
+  if (error) {
+    const normalized = error.message.toLowerCase();
+    const message = normalized.includes("no joker")
+      ? "보유한 조커 카드가 없어요."
+      : normalized.includes("partial")
+        ? "체크가 1~2개인 날에만 조커를 쓸 수 있어요."
+        : "조커를 사용하지 못했어요.";
+    redirect(`/me?error=${encodeURIComponent(message)}`);
+  }
+
+  await supabase.rpc("sync_joker_awards", { p_student_id: viewer.studentId });
+  await supabase.rpc("sync_bonus_awards", { p_student_id: viewer.studentId });
+  revalidatePath("/me");
+  revalidatePath("/me/shop");
+  redirect(`/me?message=${encodeURIComponent("조커 카드를 사용했어요.")}`);
+}

@@ -62,6 +62,7 @@ export async function upsertShopItem(roomId: string, formData: FormData) {
     needs_approval: needsApproval,
     sort_order: Number.isFinite(sortOrder) ? sortOrder : 0,
     is_active: true,
+    effect: name === "조커 카드" || icon === "🃏" ? "joker" : null,
     updated_at: new Date().toISOString(),
   };
 
