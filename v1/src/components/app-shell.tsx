@@ -1,5 +1,6 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
+import { ThemeToggle } from "@/components/theme-toggle";
 
 type AppShellProps = {
   eyebrow: string;
@@ -28,9 +29,12 @@ export function AppShell({
           </span>
           <span>도장 스트릭</span>
         </Link>
-        <span className="status-chip">
-          <span aria-hidden="true">●</span> 함께 성장 중
-        </span>
+        <div className="shell__tools">
+          <ThemeToggle />
+          <span className="status-chip">
+            <span aria-hidden="true">●</span> 함께 성장 중
+          </span>
+        </div>
       </header>
       <section className="panel">
         <span className="panel__bubble panel__bubble--one" aria-hidden="true" />

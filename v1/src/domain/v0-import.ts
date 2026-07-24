@@ -67,9 +67,38 @@ export type V0ImportPreview = {
   cardArtGrades: CardGrade[];
   recoveryAwardCount: number;
   bonusPoints: number;
+  weeklyReflectionCount: number;
+  skippedWeeklyReflectionCount: number;
   skippedFrameShopItems: number;
   warnings: string[];
 };
+
+export type WeeklyHelpfulFactor =
+  | "sleep"
+  | "planning"
+  | "teacher"
+  | "phone-away";
+
+const weeklyFactorMap: Record<string, WeeklyHelpfulFactor> = {
+  sleep: "sleep",
+  plan: "planning",
+  planning: "planning",
+  teacher: "teacher",
+  phone_away: "phone-away",
+  "phone-away": "phone-away",
+};
+
+export function mapWeeklyHelpfulFactor(
+  value: string,
+): WeeklyHelpfulFactor | null {
+  return weeklyFactorMap[value] || null;
+}
+
+/** v0 week key: `YYYY-MM-DD` or `M:YYYY-MM-DD` → calendar Monday */
+export function weekStartFromV0Key(key: string): string | null {
+  const raw = key.includes(":") ? key.slice(key.indexOf(":") + 1) : key;
+  return isIsoDate(raw) ? raw : null;
+}
 
 function isIsoDate(value: string) {
   return /^\d{4}-\d{2}-\d{2}$/.test(value);
@@ -244,6 +273,21 @@ export function parseV0State(raw: unknown): {
     warnings.push("JSON에 학생 이름이 없습니다. 가져올 학생을 직접 선택하세요.");
   }
 
+  let weeklyReflectionCount = 0;
+  let skippedWeeklyReflectionCount = 0;
+  for (const [key, value] of Object.entries(state.reflections || {})) {
+    if (!weekStartFromV0Key(key) || !mapWeeklyHelpfulFactor(value)) {
+      skippedWeeklyReflectionCount += 1;
+      continue;
+    }
+    weeklyReflectionCount += 1;
+  }
+  if (skippedWeeklyReflectionCount > 0) {
+    warnings.push(
+      `주간 성찰 ${skippedWeeklyReflectionCount}건은 값/주차 키가 맞지 않아 제외됩니다.`,
+    );
+  }
+
   return {
     state,
     preview: {
@@ -264,6 +308,8 @@ export function parseV0State(raw: unknown): {
       cardArtGrades,
       recoveryAwardCount: Object.keys(state.recoveryAwards || {}).length,
       bonusPoints: state.bonusPoints || 0,
+      weeklyReflectionCount,
+      skippedWeeklyReflectionCount,
       skippedFrameShopItems,
       warnings,
     },

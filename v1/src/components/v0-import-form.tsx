@@ -150,6 +150,12 @@ export function V0ImportForm({
               숙제조커 {preview.homeworkAwardCount} · 회복{" "}
               {preview.recoveryAwardCount} · 수동보너스 {preview.bonusPoints}P
             </li>
+            <li>
+              주간 성찰 {preview.weeklyReflectionCount}
+              {preview.skippedWeeklyReflectionCount
+                ? ` (제외 ${preview.skippedWeeklyReflectionCount})`
+                : ""}
+            </li>
           </ul>
           {preview.warnings.map((warning) => (
             <p className="form-help" key={warning}>
@@ -161,7 +167,7 @@ export function V0ImportForm({
 
       <p className="form-help">
         v0에서 JSON을 내보낸 뒤, 여기 방의 일정에 있는 날짜만 가져옵니다. 프레임
-        상점 항목과 주간 성찰 값은 이번 단계에서 제외됩니다.
+        상점 항목은 v1 등급 프레임 정책상 제외됩니다.
       </p>
 
       <button

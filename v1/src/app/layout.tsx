@@ -1,7 +1,9 @@
 import type { Metadata, Viewport } from "next";
 import { Gowun_Dodum, Jua } from "next/font/google";
 import { PwaRegister } from "@/components/pwa-register";
+import { themeInitScript } from "@/lib/theme";
 import "./globals.css";
+import "./reward-card-holo.css";
 
 const gowunDodum = Gowun_Dodum({
   variable: "--font-gowun",
@@ -41,7 +43,10 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  themeColor: "#8066e8",
+  themeColor: [
+    { media: "(prefers-color-scheme: light)", color: "#8066e8" },
+    { media: "(prefers-color-scheme: dark)", color: "#1a1625" },
+  ],
   width: "device-width",
   initialScale: 1,
   viewportFit: "cover",
@@ -53,7 +58,14 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="ko" className={`${gowunDodum.variable} ${jua.variable}`}>
+    <html
+      lang="ko"
+      className={`${gowunDodum.variable} ${jua.variable}`}
+      suppressHydrationWarning
+    >
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: themeInitScript() }} />
+      </head>
       <body>
         {children}
         <PwaRegister />

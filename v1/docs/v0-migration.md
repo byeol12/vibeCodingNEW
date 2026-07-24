@@ -46,4 +46,6 @@
 - 경로: `/dashboard/import`
 - v0의 “JSON 내보내기”로 만든 파일을 올린다.
 - 활성 학생을 고른 뒤 미리보기를 확인하고 가져온다.
-- 프레임 상점 항목·주간 성찰(`helpful_factor` 불일치)은 이 단계에서 제외한다.
+- 주간 성찰 값 매핑: `sleep→sleep`, `plan→planning`, `teacher→teacher`, `phone_away→phone-away`.
+- 프레임 상점 항목은 v1 등급 프레임 정책상 제외한다.
+- 가져오기 결과 메시지에 성공 건수와 제외 사유를 함께 표시한다.

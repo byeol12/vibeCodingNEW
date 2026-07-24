@@ -2,7 +2,12 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { parseV0JsonText, type V0State } from "@/domain/v0-import";
+import {
+  mapWeeklyHelpfulFactor,
+  parseV0JsonText,
+  weekStartFromV0Key,
+  type V0State,
+} from "@/domain/v0-import";
 import type { CardGrade } from "@/domain/contracts";
 import { requireTeacher } from "@/lib/auth/viewer";
 import { createClient } from "@/lib/supabase/server";
@@ -327,6 +332,33 @@ export async function importV0State(formData: FormData) {
 
   const artsUploaded = await importCardArts(supabase, roomId, state.cardArt);
 
+  let weeklyInserted = 0;
+  let weeklySkipped = 0;
+  for (const [key, value] of Object.entries(state.reflections || {})) {
+    const weekStart = weekStartFromV0Key(key);
+    const helpful = mapWeeklyHelpfulFactor(value);
+    if (!weekStart || !helpful) {
+      weeklySkipped += 1;
+      continue;
+    }
+    const { error } = await supabase.from("weekly_reflections").upsert(
+      {
+        room_id: roomId,
+        student_id: studentId,
+        week_start: weekStart,
+        helpful_factor: helpful,
+        updated_at: new Date().toISOString(),
+      },
+      { onConflict: "student_id,week_start" },
+    );
+    if (error) weeklySkipped += 1;
+    else weeklyInserted += 1;
+  }
+
+  const exclusions: string[] = [];
+  if (skippedDates) exclusions.push(`일정 밖 날짜 ${skippedDates}`);
+  if (weeklySkipped) exclusions.push(`주간성찰 제외 ${weeklySkipped}`);
+
   revalidatePath(`/room/${roomId}`);
   revalidatePath(`/room/${roomId}/report`);
   revalidatePath(`/room/${roomId}/shop`);
@@ -336,8 +368,8 @@ export async function importV0State(formData: FormData) {
 
   importRedirect(
     "message",
-    `${targetStudent.name} 학생에게 평가 ${evaluationsUpserted}·자기관찰 ${reflectionsUpserted}·상점 ${shopInserted}·구매 ${purchasesInserted}·아트 ${artsUploaded}·회복 ${recoveryInserted}건을 가져왔습니다.${
-      skippedDates ? ` (방 일정에 없는 날짜 ${skippedDates}건 제외)` : ""
+    `${targetStudent.name} 학생 가져오기 완료 — 평가 ${evaluationsUpserted}, 자기관찰 ${reflectionsUpserted}, 주간성찰 ${weeklyInserted}, 상점 ${shopInserted}, 구매 ${purchasesInserted}, 아트 ${artsUploaded}, 회복 ${recoveryInserted}.${
+      exclusions.length ? ` 제외: ${exclusions.join(", ")}.` : ""
     }`,
     roomId,
   );

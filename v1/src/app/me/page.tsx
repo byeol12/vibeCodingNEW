@@ -2,6 +2,7 @@ import Link from "next/link";
 import { signOut } from "@/app/auth/actions";
 import { applyJoker, saveReflection } from "@/app/me/actions";
 import { AppShell } from "@/components/app-shell";
+import { RewardCard } from "@/components/reward-card";
 import { SubmitButton } from "@/components/submit-button";
 import { deriveProgress, evaluationCount } from "@/domain/progress";
 import { requireStudent } from "@/lib/auth/viewer";
@@ -33,15 +34,6 @@ const struggleOptions = [
   ["hard", "😰 어려워서 포기했어요"],
   ["lost", "🤯 뭘 해야 할지 몰랐어요"],
 ] as const;
-
-const gradeNames = {
-  C: "커먼",
-  U: "언커먼",
-  R: "레어",
-  E: "에픽",
-  L: "레전더리",
-  J: "조커",
-} as const;
 
 type StudentHomePageProps = {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
@@ -281,34 +273,25 @@ export default async function StudentHomePage({
             </div>
           ) : (
             <>
-              <article
-                className={`reward-card reward-card--${currentGrade || "C"}`}
-              >
-                <div className="reward-card__shine" aria-hidden="true" />
-                <header>
-                  <span>{currentSession.session_date}</span>
-                  <strong>+{currentPoints}P</strong>
-                </header>
-                <div className="reward-card__art" aria-hidden="true">
-                  ★
-                </div>
-                <div className="reward-card__grade">
-                  <span>{currentGrade ? gradeNames[currentGrade] : "기록"}</span>
-                  <strong>{currentGrade || "-"}</strong>
-                </div>
-                <ul>
-                  {currentEvaluation.attitude && <li>✓ 수업 태도</li>}
-                  {currentEvaluation.participation && <li>✓ 수업 참여</li>}
-                  {currentEvaluation.homework && <li>✓ 숙제 확인</li>}
-                  {currentEvaluation.joker_used && <li>🃏 조커 사용</li>}
-                </ul>
-                {currentEvaluation.teacher_memo && (
-                  <blockquote>
-                    “{currentEvaluation.teacher_memo}”
-                    <cite>선생님 한마디</cite>
-                  </blockquote>
-                )}
-              </article>
+              <RewardCard
+                sessionDate={currentSession.session_date}
+                grade={currentGrade}
+                points={currentPoints}
+                streak={progress.streakAt[currentSession.id] || progress.currentStreak}
+                attitude={currentEvaluation.attitude}
+                participation={currentEvaluation.participation}
+                homework={currentEvaluation.homework}
+                isLucky={currentEvaluation.is_lucky}
+                jokerUsed={currentEvaluation.joker_used}
+                teacherMemo={currentEvaluation.teacher_memo}
+                praiseTags={currentReflection?.praise_tags || []}
+                studentName={viewer.name}
+                cardIndex={
+                  allSessions.findIndex((session) => session.id === currentSession.id) +
+                  1
+                }
+                totalDays={allSessions.length}
+              />
 
               <section className="reflection-section">
                 <div className="section-heading">

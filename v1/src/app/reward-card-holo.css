@@ -1,0 +1,631 @@
+/* Sequential holographic tiers — techniques from
+   https://poke-holo.simey.me / pokemon-cards-css
+   Shine/glare opacity follows pointer interaction (--card-opacity).
+
+   🔧 입자/패턴 크기 실시간 조절:
+   파일: v1/src/app/reward-card-holo.css
+   페이지: /dev/cards  (저장하면 HMR로 바로 반영)
+
+   각 등급 블록 맨 위의 변수만 바꾸면 됩니다.
+   - --holo-beam / --holo-bars   … Rare Holofoil
+   - --holo-star / --holo-band   … Cosmos
+   - --holo-grid / --holo-barwidth … Radiant
+   - --holo-stripe / --holo-foil … V diagonal
+   - --holo-space / --holo-foil  … Shiny Vault
+   값이 작을수록 입자가 촘촘해집니다.
+*/
+
+.reward-card {
+  --pointer-x: calc(var(--hover-tilt-x, 0.5) * 100%);
+  --pointer-y: calc(var(--hover-tilt-y, 0.5) * 100%);
+  --background-x: var(--pointer-x);
+  --background-y: var(--pointer-y);
+  --pointer-from-left: var(--hover-tilt-x, 0.5);
+  --pointer-from-top: var(--hover-tilt-y, 0.5);
+  --pointer-from-center: var(--hover-tilt-at-edge, 0);
+  --card-opacity: var(--hover-tilt-opacity, 0);
+  --sunpillar-1: hsl(2 100% 73%);
+  --sunpillar-2: hsl(53 100% 69%);
+  --sunpillar-3: hsl(93 100% 69%);
+  --sunpillar-4: hsl(176 100% 76%);
+  --sunpillar-5: hsl(228 100% 74%);
+  --sunpillar-6: hsl(283 100% 73%);
+  --holo-red: #f80e35;
+  --holo-yellow: #eedf10;
+  --holo-green: #21e985;
+  --holo-blue: #0dbde9;
+  --holo-violet: #c929f1;
+}
+
+.reward-card__shine,
+.reward-card__glare {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  overflow: hidden;
+  opacity: var(--card-opacity);
+  will-change: opacity, background-position, filter;
+}
+
+.reward-card__shine {
+  z-index: 2;
+  background: transparent;
+  filter: brightness(0.85) contrast(2.2) saturate(0.7);
+  mix-blend-mode: color-dodge;
+}
+
+.reward-card__glare {
+  z-index: 3;
+  mix-blend-mode: overlay;
+  background-image: radial-gradient(
+    farthest-corner circle at var(--pointer-x) var(--pointer-y),
+    hsl(0 0% 100% / 0.8) 10%,
+    hsl(0 0% 100% / 0.55) 22%,
+    hsl(0 0% 0% / 0.45) 90%
+  );
+}
+
+.reward-card__shine::before,
+.reward-card__shine::after,
+.reward-card__glare::after {
+  content: none;
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+}
+
+/* Holo only lives inside the art window */
+.reward-card__art {
+  isolation: isolate;
+}
+
+.reward-card__art .reward-card__shine,
+.reward-card__art .reward-card__glare {
+  z-index: 2;
+}
+
+.reward-card__art .reward-card__glare {
+  z-index: 3;
+}
+
+.reward-card__art .reward-card__lucky,
+.reward-card__art .reward-card__art-emoji,
+.reward-card__art .reward-card__art-caption {
+  z-index: 4;
+}
+
+/* ═══════════════════════════════════════════
+   1) BASIC (Common) — glare / flare only
+   ═══════════════════════════════════════════ */
+.reward-card[data-rarity="basic"] .reward-card__shine {
+  opacity: 0;
+}
+
+.reward-card[data-rarity="basic"] .reward-card__glare {
+  filter: brightness(0.95) contrast(1.15);
+  opacity: calc(var(--card-opacity) * 0.85);
+}
+
+/* ═══════════════════════════════════════════
+   2) REVERSE HOLO (Uncommon)
+   ═══════════════════════════════════════════ */
+.reward-card[data-rarity="reverse-holo"] .reward-card__shine {
+  background-image:
+    radial-gradient(
+      circle at var(--pointer-x) var(--pointer-y),
+      #fff 5%,
+      #000 50%,
+      #fff 80%
+    ),
+    linear-gradient(-45deg, #000 15%, #fff, #000 85%),
+    repeating-linear-gradient(
+      125deg,
+      hsl(0 0% 70%) 0 2px,
+      hsl(0 0% 40%) 2px 4px
+    );
+  background-blend-mode: soft-light, difference, normal;
+  background-size: 120% 120%, 200% 200%, 12px 12px;
+  background-position:
+    center,
+    calc(100% * var(--pointer-from-left)) calc(100% * var(--pointer-from-top)),
+    center;
+  filter: brightness(0.55) contrast(1.5) saturate(1);
+  mix-blend-mode: color-dodge;
+  opacity: calc(1.35 * var(--card-opacity) - var(--pointer-from-center) * 0.35);
+}
+
+.reward-card[data-rarity="reverse-holo"] .reward-card__glare {
+  opacity: var(--card-opacity);
+  filter: brightness(0.7) contrast(1.45);
+}
+
+.reward-card[data-rarity="reverse-holo"] .reward-card__glare::after {
+  content: "";
+  opacity: var(--card-opacity);
+  background-image: radial-gradient(
+    farthest-corner circle at var(--pointer-x) var(--pointer-y),
+    #fff 10%,
+    hsl(0 0% 100% / 0.45) 22%,
+    hsl(0 0% 0% / 0.45) 120%
+  );
+  filter: brightness(1) contrast(1.45);
+  mix-blend-mode: overlay;
+}
+
+/* ═══════════════════════════════════════════
+   3) RARE HOLO — vertical beam + scanlines
+   ═══════════════════════════════════════════ */
+.reward-card[data-rarity="rare-holo"] .reward-card__shine {
+  /* 🔧 Rare Holofoil 입자: 값↓ = 더 촘촘 */
+  --holo-beam: 140% 280%;
+  --holo-bars: 0.0005%;
+  --scanlines-space: 0.5px;
+  background-image:
+    repeating-linear-gradient(
+      150deg,
+      var(--holo-violet),
+      var(--holo-blue),
+      var(--holo-green),
+      var(--holo-yellow),
+      var(--holo-red),
+      var(--holo-violet),
+      var(--holo-blue),
+      var(--holo-green),
+      var(--holo-yellow),
+      var(--holo-red),
+      var(--holo-violet),
+      var(--holo-blue),
+      var(--holo-green),
+      var(--holo-yellow),
+      var(--holo-red)
+    ),
+    repeating-linear-gradient(
+      90deg,
+      #111 0 calc(var(--scanlines-space) * 2),
+      #666 calc(var(--scanlines-space) * 2) calc(var(--scanlines-space) * 4)
+    );
+  background-size: var(--holo-beam), auto;
+  background-position:
+    calc(((50% - var(--background-x)) * 1.8) + 50%)
+      calc(((50% - var(--background-y)) * 2.2) + 50%),
+    center;
+  background-blend-mode: overlay;
+  filter: brightness(0.95) contrast(1.25) saturate(1.2);
+  mix-blend-mode: color-dodge;
+}
+
+.reward-card[data-rarity="rare-holo"] .reward-card__shine::before {
+  content: "";
+  --bars: var(--holo-bars);
+  background-image:
+    repeating-linear-gradient(
+      90deg,
+      #000 calc(var(--bars) * 2),
+      hsl(0 0% 70%) calc(var(--bars) * 3),
+      #000 calc(var(--bars) * 3.5),
+      hsl(0 0% 70%) calc(var(--bars) * 4),
+      #000 calc(var(--bars) * 5),
+      #000 calc(var(--bars) * 14)
+    ),
+    repeating-linear-gradient(
+      90deg,
+      #000 calc(var(--bars) * 2),
+      hsl(0 0% 70%) calc(var(--bars) * 3),
+      #000 calc(var(--bars) * 3.5),
+      hsl(0 0% 70%) calc(var(--bars) * 4),
+      #000 calc(var(--bars) * 5),
+      #000 calc(var(--bars) * 10)
+    );
+  background-size: 140% 180%, 160% 200%;
+  background-position:
+    calc((((50% - var(--background-x)) * 1.2) + 50%) + (var(--background-y) * 0.35))
+      var(--background-x),
+    calc((((50% - var(--background-x)) * -0.7) + 50%) - (var(--background-y) * 0.5))
+      var(--background-y);
+  background-blend-mode: screen;
+  filter: brightness(1.05) contrast(1.15);
+  mix-blend-mode: hard-light;
+}
+
+.reward-card[data-rarity="rare-holo"] .reward-card__shine::after {
+  content: "";
+  background-image: radial-gradient(
+    farthest-corner circle at var(--pointer-x) var(--pointer-y),
+    hsl(0 0% 90% / 0.65) 0%,
+    hsl(0 0% 78% / 0.08) 28%,
+    #000 90%
+  );
+  mix-blend-mode: luminosity;
+  filter: brightness(0.55) contrast(2.8);
+}
+
+.reward-card[data-rarity="rare-holo"] .reward-card__glare {
+  opacity: calc(var(--card-opacity) * 0.75);
+  filter: brightness(0.78) contrast(1.4);
+}
+
+.reward-card[data-rarity="rare-holo"] .reward-card__glare::after {
+  content: "";
+  background-image: radial-gradient(
+    farthest-corner circle at var(--pointer-x) var(--pointer-y),
+    hsl(180 100% 95%) 5%,
+    hsl(0 0% 39% / 0.22) 55%,
+    hsl(0 0% 0% / 0.35) 110%
+  );
+  mix-blend-mode: overlay;
+  filter: brightness(0.6) contrast(2.2);
+}
+
+/* ═══════════════════════════════════════════
+   4) COSMOS / GALAXY HOLO
+   ═══════════════════════════════════════════ */
+.reward-card[data-rarity="cosmos"] .reward-card__shine {
+  /* 🔧 Cosmos 입자: --holo-star↓ = 별 촘촘, --holo-band↓ = 프리즘 띠 촘촘 */
+  --holo-star: 42px;
+  --holo-band: 2.2%;
+  --space: var(--holo-band);
+  background-image:
+    radial-gradient(circle at 20% 30%, hsl(190 80% 85%) 0 0.45px, transparent 1px),
+    radial-gradient(circle at 70% 55%, hsl(280 70% 88%) 0 0.5px, transparent 1.1px),
+    radial-gradient(circle at 40% 80%, hsl(50 80% 85%) 0 0.4px, transparent 0.9px),
+    radial-gradient(circle at 85% 20%, hsl(170 70% 85%) 0 0.55px, transparent 1.15px),
+    radial-gradient(circle at 55% 42%, #fff 0 0.35px, transparent 0.8px),
+    repeating-linear-gradient(
+      82deg,
+      hsl(53 70% 42%) calc(var(--space) * 1),
+      hsl(93 60% 38%) calc(var(--space) * 2),
+      hsl(176 55% 40%) calc(var(--space) * 3),
+      hsl(228 60% 48%) calc(var(--space) * 4),
+      hsl(283 55% 48%) calc(var(--space) * 5),
+      hsl(326 55% 44%) calc(var(--space) * 6),
+      hsl(326 55% 44%) calc(var(--space) * 7),
+      hsl(283 55% 48%) calc(var(--space) * 8),
+      hsl(228 60% 48%) calc(var(--space) * 9),
+      hsl(176 55% 40%) calc(var(--space) * 10),
+      hsl(93 60% 38%) calc(var(--space) * 11),
+      hsl(53 70% 42%) calc(var(--space) * 12)
+    ),
+    radial-gradient(
+      farthest-corner circle at var(--pointer-x) var(--pointer-y),
+      hsl(200 40% 35% / 0.55) 8%,
+      hsl(260 35% 22% / 0.7) 45%,
+      hsl(220 40% 8%) 120%
+    );
+  background-size:
+    var(--holo-star) var(--holo-star),
+    calc(var(--holo-star) * 1.33) calc(var(--holo-star) * 1.33),
+    calc(var(--holo-star) * 0.9) calc(var(--holo-star) * 0.9),
+    calc(var(--holo-star) * 1.14) calc(var(--holo-star) * 1.14),
+    calc(var(--holo-star) * 0.8) calc(var(--holo-star) * 0.8),
+    220% 520%,
+    cover;
+  background-position:
+    calc(var(--pointer-from-left) * 40%) calc(var(--pointer-from-top) * 40%),
+    calc(50% + var(--pointer-from-left) * 25%) calc(30% + var(--pointer-from-top) * 30%),
+    calc(20% + var(--pointer-from-left) * 30%) calc(70% + var(--pointer-from-top) * 20%),
+    calc(78% - var(--pointer-from-left) * 22%) calc(16% + var(--pointer-from-top) * 24%),
+    calc(40% + var(--pointer-from-left) * 18%) calc(48% + var(--pointer-from-top) * 18%),
+    calc(10% + var(--pointer-from-left) * 80%) calc(10% + var(--pointer-from-top) * 80%),
+    center;
+  background-blend-mode: screen, screen, screen, screen, screen, soft-light, multiply;
+  filter: brightness(0.78) contrast(1.35) saturate(1.25);
+  mix-blend-mode: soft-light;
+}
+
+.reward-card[data-rarity="cosmos"] .reward-card__glare {
+  opacity: calc(var(--card-opacity) * 0.9);
+  filter: brightness(0.7) contrast(1.45);
+  background-image: radial-gradient(
+    farthest-corner circle at var(--pointer-x) var(--pointer-y),
+    hsl(190 80% 85% / 0.55) 8%,
+    hsl(260 50% 40% / 0.25) 35%,
+    hsl(0 0% 0% / 0.55) 90%
+  );
+}
+
+/* ═══════════════════════════════════════════
+   5) RADIANT — criss-cross bars
+   ═══════════════════════════════════════════ */
+.reward-card[data-rarity="radiant"] .reward-card__shine {
+  /* 🔧 Radiant 격자: --holo-grid↓ = 격자 촘촘, --holo-barwidth↓ = 선 가늘게 */
+  --holo-grid: 70px;
+  --holo-barwidth: 0.45%;
+  --barwidth: var(--holo-barwidth);
+  background-image:
+    radial-gradient(
+      farthest-corner ellipse at calc(var(--pointer-x) * 0.5 + 25%)
+        calc(var(--pointer-y) * 0.5 + 25%),
+      hsl(0 0% 92% / 0.85) 12%,
+      var(--grade-color, hsl(280 80% 70%)) 130%
+    ),
+    repeating-linear-gradient(
+      45deg,
+      hsl(0 0% 8%) 0,
+      hsl(0 0% 8%) var(--barwidth),
+      hsl(0 0% 18%) calc(var(--barwidth) + 0.01%),
+      hsl(0 0% 18%) calc(var(--barwidth) * 2),
+      hsl(0 0% 32%) calc(var(--barwidth) * 2 + 0.01%),
+      hsl(0 0% 32%) calc(var(--barwidth) * 3),
+      hsl(0 0% 45%) calc(var(--barwidth) * 3 + 0.01%),
+      hsl(0 0% 45%) calc(var(--barwidth) * 4),
+      hsl(0 0% 32%) calc(var(--barwidth) * 4 + 0.01%),
+      hsl(0 0% 32%) calc(var(--barwidth) * 5),
+      hsl(0 0% 18%) calc(var(--barwidth) * 5 + 0.01%),
+      hsl(0 0% 18%) calc(var(--barwidth) * 6),
+      hsl(0 0% 8%) calc(var(--barwidth) * 6 + 0.01%),
+      hsl(0 0% 8%) calc(var(--barwidth) * 7),
+      #000 calc(var(--barwidth) * 7 + 0.01%),
+      #000 calc(var(--barwidth) * 8)
+    ),
+    repeating-linear-gradient(
+      -45deg,
+      hsl(0 0% 8%) 0,
+      hsl(0 0% 8%) var(--barwidth),
+      hsl(0 0% 18%) calc(var(--barwidth) + 0.01%),
+      hsl(0 0% 18%) calc(var(--barwidth) * 2),
+      hsl(0 0% 32%) calc(var(--barwidth) * 2 + 0.01%),
+      hsl(0 0% 32%) calc(var(--barwidth) * 3),
+      hsl(0 0% 45%) calc(var(--barwidth) * 3 + 0.01%),
+      hsl(0 0% 45%) calc(var(--barwidth) * 4),
+      hsl(0 0% 32%) calc(var(--barwidth) * 4 + 0.01%),
+      hsl(0 0% 32%) calc(var(--barwidth) * 5),
+      hsl(0 0% 18%) calc(var(--barwidth) * 5 + 0.01%),
+      hsl(0 0% 18%) calc(var(--barwidth) * 6),
+      hsl(0 0% 8%) calc(var(--barwidth) * 6 + 0.01%),
+      hsl(0 0% 8%) calc(var(--barwidth) * 7),
+      #000 calc(var(--barwidth) * 7 + 0.01%),
+      #000 calc(var(--barwidth) * 8)
+    );
+  background-size: cover, var(--holo-grid) var(--holo-grid), var(--holo-grid) var(--holo-grid);
+  background-position:
+    center,
+    calc(var(--pointer-from-left) * 100%) calc(var(--pointer-from-top) * 100%),
+    calc((1 - var(--pointer-from-left)) * 100%) calc((1 - var(--pointer-from-top)) * 100%);
+  background-blend-mode: soft-light, soft-light, soft-light;
+  filter: brightness(calc(0.68 + var(--pointer-from-center) * 0.22)) contrast(1.4)
+    saturate(1.15);
+  mix-blend-mode: color-dodge;
+}
+
+/* ═══════════════════════════════════════════
+   6) V / DIAGONAL metallic
+   ═══════════════════════════════════════════ */
+.reward-card[data-rarity="v"] .reward-card__shine {
+  /* 🔧 V diagonal: --holo-stripe↓ = 빗금 촘촘, --holo-foil↓ = 컬러 그라데이션 촘촘 */
+  --holo-stripe: 48px;
+  --holo-foil: 180% 180%;
+  background-image:
+    repeating-linear-gradient(
+      115deg,
+      hsl(220 25% 18% / 0.15) 0 1px,
+      hsl(0 0% 100% / 0.22) 1.5px 2.5px,
+      hsl(220 30% 12% / 0.35) 3px 5px,
+      transparent 5px 9px
+    ),
+    repeating-linear-gradient(
+      -115deg,
+      hsl(280 20% 16% / 0.12) 0 1px,
+      hsl(0 0% 100% / 0.16) 1.5px 2.5px,
+      hsl(200 25% 14% / 0.3) 3px 5px,
+      transparent 5px 9px
+    ),
+    linear-gradient(
+      125deg,
+      hsl(2 70% 42%),
+      hsl(53 75% 40%),
+      hsl(176 60% 38%),
+      hsl(228 65% 45%),
+      hsl(283 60% 44%),
+      hsl(2 70% 42%)
+    );
+  background-size: var(--holo-stripe) var(--holo-stripe), var(--holo-stripe) var(--holo-stripe), var(--holo-foil);
+  background-position:
+    calc(var(--pointer-from-left) * 100%) calc(var(--pointer-from-top) * 100%),
+    calc((1 - var(--pointer-from-left)) * 100%) calc((1 - var(--pointer-from-top)) * 100%),
+    var(--background-x) var(--background-y);
+  background-blend-mode: soft-light, soft-light, multiply;
+  filter: brightness(0.72) contrast(1.45) saturate(1.2);
+  mix-blend-mode: soft-light;
+}
+
+.reward-card[data-rarity="v"] .reward-card__glare {
+  opacity: calc(var(--card-opacity) * 0.85);
+  filter: brightness(0.72) contrast(1.4);
+  background-image: radial-gradient(
+    farthest-corner circle at var(--pointer-x) var(--pointer-y),
+    hsl(210 60% 80% / 0.45) 8%,
+    hsl(280 40% 35% / 0.2) 40%,
+    hsl(0 0% 0% / 0.5) 90%
+  );
+}
+
+/* ═══════════════════════════════════════════
+   7) RAINBOW RARE
+   ═══════════════════════════════════════════ */
+.reward-card[data-rarity="rainbow"] .reward-card__shine {
+  --r1: hsl(0 57% 40%);
+  --r2: hsl(40 53% 42%);
+  --r3: hsl(90 60% 38%);
+  --r4: hsl(180 60% 38%);
+  --r5: hsl(210 57% 42%);
+  --r6: hsl(280 55% 36%);
+  background-image:
+    linear-gradient(-45deg, var(--r1), var(--r4)),
+    radial-gradient(circle, hsl(0 0% 100% / 0.55) 0 0.7px, transparent 1.3px),
+    linear-gradient(
+      -30deg,
+      var(--r1),
+      var(--r2),
+      var(--r3),
+      var(--r4),
+      var(--r5),
+      var(--r6),
+      var(--r1),
+      var(--r2),
+      var(--r3),
+      var(--r4),
+      var(--r5),
+      var(--r6),
+      var(--r1)
+    );
+  background-size: 200% 200%, 16px 16px, 400% 400%;
+  background-position:
+    calc(25% + 50% * var(--pointer-from-left)) calc(25% + 50% * var(--pointer-from-top)),
+    center,
+    calc(25% + var(--pointer-x) / 2) calc(25% + var(--pointer-y) / 2);
+  background-blend-mode: luminosity, soft-light, normal;
+  filter: brightness(calc(0.55 + var(--pointer-from-center) * 0.28)) contrast(2)
+    saturate(0.8);
+  mix-blend-mode: color-dodge;
+}
+
+.reward-card[data-rarity="rainbow"] .reward-card__shine::after {
+  content: "";
+  background-image:
+    radial-gradient(circle, hsl(0 0% 100% / 0.5) 0 0.7px, transparent 1.3px),
+    linear-gradient(
+      -60deg,
+      var(--r1),
+      var(--r2),
+      var(--r3),
+      var(--r4),
+      var(--r5),
+      var(--r6),
+      var(--r1),
+      var(--r2),
+      var(--r3),
+      var(--r4),
+      var(--r5),
+      var(--r6),
+      var(--r1)
+    );
+  background-size: 16px 16px, 400% 400%;
+  background-position: center, var(--pointer-x) var(--pointer-y);
+  background-blend-mode: soft-light;
+  filter: brightness(calc(0.5 + var(--pointer-from-center) * 0.25)) contrast(1.8)
+    saturate(1);
+  mix-blend-mode: color-dodge;
+}
+
+/* ═══════════════════════════════════════════
+   8) SECRET GOLD
+   ═══════════════════════════════════════════ */
+.reward-card[data-rarity="secret-gold"] .reward-card__shine {
+  background-image:
+    radial-gradient(circle, hsl(45 100% 85% / 0.9) 0 0.6px, transparent 1.2px),
+    radial-gradient(circle, hsl(35 90% 70% / 0.7) 0 0.8px, transparent 1.5px),
+    linear-gradient(
+      120deg,
+      hsl(40 80% 35%),
+      hsl(48 100% 62%),
+      hsl(35 70% 40%),
+      hsl(50 100% 70%),
+      hsl(40 80% 35%)
+    );
+  background-size: 14px 14px, 22px 22px, 220% 220%;
+  background-position:
+    calc(var(--pointer-from-left) * 40%) calc(var(--pointer-from-top) * 40%),
+    calc((1 - var(--pointer-from-left)) * 50%) calc((1 - var(--pointer-from-top)) * 50%),
+    var(--background-x) var(--background-y);
+  background-blend-mode: overlay, soft-light, normal;
+  filter: brightness(calc(0.7 + var(--pointer-from-center) * 0.2)) contrast(1.35)
+    saturate(1.1);
+  mix-blend-mode: color-dodge;
+}
+
+/* ═══════════════════════════════════════════
+   9) SHINY VAULT / JOKER
+   ═══════════════════════════════════════════ */
+.reward-card[data-rarity="shiny"] .reward-card__shine {
+  /* 🔧 Shiny Vault: --holo-space↓ = 컬러띠 촘촘, --holo-foil↓ = 실버바 촘촘 */
+  --holo-space: 5%;
+  --holo-foil: 0.5%;
+  --space: var(--holo-space);
+  --angle: 133deg;
+  background-image:
+    repeating-linear-gradient(
+      0deg,
+      var(--sunpillar-1) calc(var(--space) * 1),
+      var(--sunpillar-2) calc(var(--space) * 2),
+      var(--sunpillar-3) calc(var(--space) * 3),
+      var(--sunpillar-4) calc(var(--space) * 4),
+      var(--sunpillar-5) calc(var(--space) * 5),
+      var(--sunpillar-6) calc(var(--space) * 6),
+      var(--sunpillar-1) calc(var(--space) * 7)
+    ),
+    repeating-linear-gradient(
+      var(--angle),
+      #0e152e 0%,
+      hsl(180 10% 58%) calc(var(--holo-foil) * 0.35),
+      hsl(180 28% 66%) calc(var(--holo-foil) * 0.45),
+      hsl(180 10% 58%) calc(var(--holo-foil) * 0.55),
+      #0e152e var(--holo-foil),
+      #0e152e calc(var(--holo-foil) * 1.2)
+    ),
+    radial-gradient(
+      farthest-corner circle at var(--pointer-x) var(--pointer-y),
+      hsl(0 0% 0% / 0.12) 12%,
+      hsl(0 0% 0% / 0.2) 24%,
+      hsl(0 0% 0% / 0.32) 120%
+    );
+  background-size: 140% 420%, 180% 100%, 200% 100%;
+  background-position:
+    0% var(--background-y),
+    calc(var(--background-x) + var(--background-y) * 0.15) var(--background-y),
+    var(--background-x) var(--background-y);
+  background-blend-mode: soft-light, hard-light, soft-light;
+  filter: brightness(calc(0.48 + var(--pointer-from-center) * 0.3)) contrast(1.5)
+    saturate(1.65);
+  mix-blend-mode: color-dodge;
+}
+
+.reward-card[data-rarity="shiny"] .reward-card__shine::after {
+  content: "";
+  background-image:
+    repeating-linear-gradient(
+      0deg,
+      var(--sunpillar-6) calc(var(--space) * 1),
+      var(--sunpillar-1) calc(var(--space) * 2),
+      var(--sunpillar-2) calc(var(--space) * 3),
+      var(--sunpillar-3) calc(var(--space) * 4),
+      var(--sunpillar-4) calc(var(--space) * 5),
+      var(--sunpillar-5) calc(var(--space) * 6),
+      var(--sunpillar-6) calc(var(--space) * 7)
+    ),
+    repeating-linear-gradient(
+      calc(var(--angle) * -1),
+      #0e152e 0%,
+      hsl(180 10% 58%) calc(var(--holo-foil) * 0.35),
+      hsl(180 28% 66%) calc(var(--holo-foil) * 0.45),
+      hsl(180 10% 58%) calc(var(--holo-foil) * 0.55),
+      #0e152e var(--holo-foil),
+      #0e152e calc(var(--holo-foil) * 1.2)
+    );
+  background-size: 140% 420%, 180% 100%;
+  background-position:
+    0% calc(100% - var(--background-y)),
+    calc(100% - var(--background-x)) calc(100% - var(--background-y));
+  background-blend-mode: soft-light, hard-light;
+  filter: brightness(calc(0.42 + var(--pointer-from-center) * 0.28)) contrast(1.35)
+    saturate(1.5);
+  mix-blend-mode: color-dodge;
+  opacity: 0.8;
+}
+
+.reward-card[data-rarity="shiny"] .reward-card__glare {
+  background-image: radial-gradient(
+    farthest-corner circle at var(--pointer-x) var(--pointer-y),
+    hsl(320 100% 92% / 0.75) 6%,
+    hsl(200 100% 80% / 0.28) 28%,
+    hsl(0 0% 0% / 0.4) 90%
+  );
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .reward-card__shine,
+  .reward-card__glare {
+    opacity: 0 !important;
+  }
+}
