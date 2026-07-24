@@ -1,6 +1,11 @@
 import Link from "next/link";
-import { AppShell, FoundationNotice } from "@/components/app-shell";
+import { signOut } from "@/app/auth/actions";
+import { saveReflection } from "@/app/me/actions";
+import { AppShell } from "@/components/app-shell";
+import { SubmitButton } from "@/components/submit-button";
+import { deriveProgress, evaluationCount } from "@/domain/progress";
 import { requireStudent } from "@/lib/auth/viewer";
+import { createClient } from "@/lib/supabase/server";
 
 const sections = [
   ["dex", "카드 도감"],
@@ -8,26 +13,301 @@ const sections = [
   ["stats", "성장 그래프"],
 ] as const;
 
-export default async function StudentHomePage() {
+const praiseOptions = [
+  ["hand", "🙋 먼저 손 들고 발표"],
+  ["ask", "🧠 모르는 걸 질문"],
+  ["note", "✍️ 필기를 꼼꼼히"],
+  ["time", "⏰ 제시간에 도착"],
+  ["retry", "🔁 틀린 문제 다시 풀기"],
+  ["help", "🤝 친구를 도와줌"],
+  ["focus", "🎯 끝까지 집중"],
+  ["grit", "💪 포기하지 않음"],
+  ["prep", "📚 예습·복습 완료"],
+  ["greet", "😊 밝게 인사"],
+] as const;
+
+const struggleOptions = [
+  ["sleepy", "😴 잠이 부족했어요"],
+  ["phone", "📱 폰이 자꾸 생각났어요"],
+  ["focus", "🌀 집중이 안 됐어요"],
+  ["hard", "😰 어려워서 포기했어요"],
+  ["lost", "🤯 뭘 해야 할지 몰랐어요"],
+] as const;
+
+const gradeNames = {
+  C: "커먼",
+  U: "언커먼",
+  R: "레어",
+  E: "에픽",
+  L: "레전더리",
+  J: "조커",
+} as const;
+
+type StudentHomePageProps = {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+};
+
+function first(value: string | string[] | undefined) {
+  return Array.isArray(value) ? value[0] : value;
+}
+
+export default async function StudentHomePage({
+  searchParams,
+}: StudentHomePageProps) {
   const viewer = await requireStudent();
+  const supabase = await createClient();
+  const query = await searchParams;
+  const error = first(query.error);
+  const message = first(query.message);
+  const today = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Seoul",
+  }).format(new Date());
+  const [
+    { data: room },
+    { data: sessions },
+    { data: evaluations },
+    { data: reflections },
+  ] =
+    viewer.status === "active"
+      ? await Promise.all([
+          supabase
+            .from("rooms")
+            .select("title")
+            .eq("id", viewer.roomId)
+            .maybeSingle(),
+          supabase
+            .from("sessions")
+            .select("id,session_date")
+            .eq("room_id", viewer.roomId)
+            .lte("session_date", today)
+            .order("session_date"),
+          supabase
+            .from("evaluations")
+            .select(
+              "session_id,attitude,participation,homework,is_lucky,joker_used,teacher_memo",
+            )
+            .eq("room_id", viewer.roomId)
+            .eq("student_id", viewer.studentId),
+          supabase
+            .from("reflections")
+            .select("session_id,praise_tags,struggle_tags")
+            .eq("room_id", viewer.roomId)
+            .eq("student_id", viewer.studentId),
+        ])
+      : [
+          { data: null },
+          { data: [] },
+          { data: [] },
+          { data: [] },
+        ];
+  const allSessions = sessions || [];
+  const allEvaluations = evaluations || [];
+  const allReflections = reflections || [];
+  const currentSession = allSessions.at(-1) || null;
+  const currentEvaluation = currentSession
+    ? allEvaluations.find(
+        (evaluation) => evaluation.session_id === currentSession.id,
+      )
+    : null;
+  const currentReflection = currentSession
+    ? allReflections.find(
+        (reflection) => reflection.session_id === currentSession.id,
+      )
+    : null;
+  const progress = deriveProgress(
+    allSessions,
+    allEvaluations,
+    allReflections,
+  );
+  const currentGrade = currentSession
+    ? progress.gradeAt[currentSession.id]
+    : null;
+  const currentPoints = currentSession
+    ? progress.pointsAt[currentSession.id] || 0
+    : 0;
+  const evaluatedCount = evaluationCount(currentEvaluation);
+
+  const statusCopy = {
+    pending: {
+      title: "입장 승인 대기",
+      description: `${viewer.name} 학생의 요청을 선생님께 보냈습니다. 승인되면 카드와 상점을 볼 수 있어요.`,
+    },
+    active: {
+      title: "오늘의 카드",
+      description: `${room?.title || "수업 방"} · ${viewer.name} 학생의 성장 기록`,
+    },
+    revoked: {
+      title: "입장이 중지되었습니다",
+      description: "현재 이 수업 방을 이용할 수 없습니다. 선생님에게 문의해 주세요.",
+    },
+  }[viewer.status];
 
   return (
     <AppShell
       eyebrow="Student home"
-      title={viewer.status === "pending" ? "입장 승인 대기" : "오늘의 카드"}
-      description="학생의 카드, 스트릭, 사용 가능한 포인트를 보여줄 홈 화면입니다."
+      title={statusCopy.title}
+      description={statusCopy.description}
     >
-      <ul className="route-list">
-        {sections.map(([path, label]) => (
-          <li key={path}>
-            <Link href={`/me/${path}`}>
-              <strong>{label}</strong>
-              <span>/me/{path}</span>
-            </Link>
-          </li>
-        ))}
-      </ul>
-      <FoundationNotice />
+      {error && (
+        <p className="alert alert--error" role="alert">
+          {error}
+        </p>
+      )}
+      {message && (
+        <p className="alert alert--success" role="status">
+          {message}
+        </p>
+      )}
+
+      {viewer.status === "pending" && (
+        <div className="approval-wait" role="status">
+          <span className="approval-wait__icon" aria-hidden="true">
+            ⏳
+          </span>
+          <div>
+            <strong>선생님의 승인을 기다리고 있어요</strong>
+            <p>승인 후 이 페이지를 새로고침하면 바로 시작할 수 있습니다.</p>
+          </div>
+        </div>
+      )}
+
+      {viewer.status === "active" && (
+        <>
+          <div className="student-summary">
+            <div>
+              <span>총 별 포인트</span>
+              <strong>{progress.totalPoints}P</strong>
+            </div>
+            <div>
+              <span>현재 스트릭</span>
+              <strong>{progress.currentStreak}일</strong>
+            </div>
+            <div>
+              <span>최고 스트릭</span>
+              <strong>{progress.bestStreak}일</strong>
+            </div>
+          </div>
+
+          {!currentSession ? (
+            <p className="empty-state">아직 시작된 수업일이 없습니다.</p>
+          ) : !currentEvaluation || evaluatedCount === 0 ? (
+            <div className="approval-wait" role="status">
+              <span className="approval-wait__icon" aria-hidden="true">
+                ✏️
+              </span>
+              <div>
+                <strong>선생님 평가를 기다리고 있어요</strong>
+                <p>{currentSession.session_date} 수업 평가가 등록되면 카드가 열립니다.</p>
+              </div>
+            </div>
+          ) : (
+            <>
+              <article
+                className={`reward-card reward-card--${currentGrade || "C"}`}
+              >
+                <div className="reward-card__shine" aria-hidden="true" />
+                <header>
+                  <span>{currentSession.session_date}</span>
+                  <strong>+{currentPoints}P</strong>
+                </header>
+                <div className="reward-card__art" aria-hidden="true">
+                  ★
+                </div>
+                <div className="reward-card__grade">
+                  <span>{currentGrade ? gradeNames[currentGrade] : "기록"}</span>
+                  <strong>{currentGrade || "-"}</strong>
+                </div>
+                <ul>
+                  {currentEvaluation.attitude && <li>✓ 수업 태도</li>}
+                  {currentEvaluation.participation && <li>✓ 수업 참여</li>}
+                  {currentEvaluation.homework && <li>✓ 숙제 확인</li>}
+                </ul>
+                {currentEvaluation.teacher_memo && (
+                  <blockquote>
+                    “{currentEvaluation.teacher_memo}”
+                    <cite>선생님 한마디</cite>
+                  </blockquote>
+                )}
+              </article>
+
+              <section className="reflection-section">
+                <div className="section-heading">
+                  <div>
+                    <p className="eyebrow">Self check</p>
+                    <h2>오늘의 자기관찰</h2>
+                  </div>
+                  <span className="count-badge">칭찬 최대 3개</span>
+                </div>
+                <form
+                  className="reflection-form"
+                  action={saveReflection.bind(null, currentSession.id)}
+                >
+                  <fieldset>
+                    <legend>오늘 잘한 것</legend>
+                    <div className="reflection-chips">
+                      {praiseOptions.map(([value, label]) => (
+                        <label key={value}>
+                          <input
+                            type="checkbox"
+                            name="praise"
+                            value={value}
+                            defaultChecked={
+                              currentReflection?.praise_tags.includes(value) ||
+                              false
+                            }
+                          />
+                          <span>{label}</span>
+                        </label>
+                      ))}
+                    </div>
+                  </fieldset>
+                  <fieldset>
+                    <legend>
+                      오늘 어려웠던 것 <small>감점 없음</small>
+                    </legend>
+                    <div className="reflection-chips reflection-chips--struggle">
+                      {struggleOptions.map(([value, label]) => (
+                        <label key={value}>
+                          <input
+                            type="checkbox"
+                            name="struggle"
+                            value={value}
+                            defaultChecked={
+                              currentReflection?.struggle_tags.includes(value) ||
+                              false
+                            }
+                          />
+                          <span>{label}</span>
+                        </label>
+                      ))}
+                    </div>
+                  </fieldset>
+                  <SubmitButton pendingLabel="기록 저장 중…">
+                    자기관찰 저장
+                  </SubmitButton>
+                </form>
+              </section>
+            </>
+          )}
+
+          <ul className="route-list">
+            {sections.map(([path, label]) => (
+              <li key={path}>
+                <Link href={`/me/${path}`}>
+                  <strong>{label}</strong>
+                  <span>/me/{path}</span>
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </>
+      )}
+
+      <form className="actions" action={signOut}>
+        <SubmitButton className="button" pendingLabel="나가는 중…">
+          이 브라우저에서 나가기
+        </SubmitButton>
+      </form>
     </AppShell>
   );
 }

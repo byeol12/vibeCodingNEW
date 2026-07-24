@@ -16,13 +16,25 @@ export function AppShell({
 }: AppShellProps) {
   return (
     <main className="shell">
+      <div className="page-sparkles" aria-hidden="true">
+        <span>✦</span>
+        <span>●</span>
+        <span>★</span>
+      </div>
       <header className="shell__header">
         <Link className="brand" href="/">
-          도장 스트릭
+          <span className="brand__mark" aria-hidden="true">
+            ★
+          </span>
+          <span>도장 스트릭</span>
         </Link>
-        <span className="status-chip">v1 beta</span>
+        <span className="status-chip">
+          <span aria-hidden="true">●</span> 함께 성장 중
+        </span>
       </header>
       <section className="panel">
+        <span className="panel__bubble panel__bubble--one" aria-hidden="true" />
+        <span className="panel__bubble panel__bubble--two" aria-hidden="true" />
         <p className="eyebrow">{eyebrow}</p>
         <h1>{title}</h1>
         <p className="lead">{description}</p>

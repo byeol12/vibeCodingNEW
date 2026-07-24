@@ -1,13 +1,14 @@
-import { AppShell, FoundationNotice } from "@/components/app-shell";
+import { AppShell } from "@/components/app-shell";
+import { StudentJoinForm } from "@/components/student-join-form";
 
 export default function JoinPage() {
   return (
     <AppShell
       eyebrow="Student"
       title="방 코드로 입장"
-      description="6자리 코드와 이름을 받아 익명 Auth 세션을 만드는 공개 진입점입니다."
+      description="선생님에게 받은 6자리 코드와 이름만 입력하세요."
     >
-      <FoundationNotice />
+      <StudentJoinForm />
     </AppShell>
   );
 }

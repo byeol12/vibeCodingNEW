@@ -8,6 +8,8 @@ export type Viewer =
       role: "student";
       userId: string;
       studentId: string;
+      roomId: string;
+      name: string;
       status: "pending" | "active" | "revoked";
     };
 
@@ -22,7 +24,7 @@ export async function getViewer(): Promise<Viewer | null> {
   if (data.claims.is_anonymous === true) {
     const { data: student } = await supabase
       .from("students")
-      .select("id,status")
+      .select("id,room_id,name,status")
       .eq("auth_user_id", userId)
       .maybeSingle();
 
@@ -31,6 +33,8 @@ export async function getViewer(): Promise<Viewer | null> {
       role: "student",
       userId,
       studentId: student.id,
+      roomId: student.room_id,
+      name: student.name,
       status: student.status,
     };
   }
@@ -53,5 +57,11 @@ export async function requireTeacher() {
 export async function requireStudent() {
   const viewer = await getViewer();
   if (!viewer || viewer.role !== "student") redirect("/join");
+  return viewer;
+}
+
+export async function requireActiveStudent() {
+  const viewer = await requireStudent();
+  if (viewer.status !== "active") redirect("/me");
   return viewer;
 }

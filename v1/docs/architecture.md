@@ -20,7 +20,11 @@ flowchart LR
   StudentPages --> Reflection[학생자기관찰]
   Evaluation --> Derived[포인트등급스트릭계산]
   Reflection --> Derived
-  Derived --> Card[Canvas카드DTO]
+  Derived --> Card[등급카드]
+  Derived --> ShopBalance[상점잔액]
+  StudentPages --> Purchase[request_purchase RPC]
+  Purchase --> TeacherApprove[교사승인]
+  TeacherApprove --> ShopBalance
 ```
 
 ## 권한 확인 위치
@@ -28,12 +32,12 @@ flowchart LR
 1. `proxy.ts`는 세션 쿠키를 갱신하고 보호 경로의 무세션 접근을 돌려보낸다.
 2. Server Component는 `requireTeacher()` 또는 `requireStudent()`로 실제 JWT와 DB 역할을 다시 확인한다.
 3. 모든 데이터 접근은 RLS를 최종 권한 경계로 사용한다.
-4. 가격·한도·잔액처럼 경쟁 상태가 생기는 구매 로직은 클라이언트가 아니라 후속 원자적 RPC에서 처리한다.
+4. 구매 한도·중복 pending은 `request_purchase` RPC에서 검사한다. 잔액은 서버 액션에서 평가·구매 내역으로 계산한 뒤 RPC를 호출한다(잔액 원자 검사는 후속 강화).
 
 ## Storage 경로
 
-카드 이미지는 `card-art/{room_id}/{grade}/{file}` 형식을 사용한다. 버킷은 비공개이며 방 교사만 쓰고 승인된 방 구성원만 읽는다.
+카드 이미지는 `card-art` 버킷 안의 `{room_id}/{grade}/{file}` 경로를 사용한다. 버킷은 비공개이며 방 교사만 쓰고 승인된 방 구성원만 읽는다. UI는 signed URL로 미리보기를 제공한다.
 
-## 다음 구현 단위
+## 현재 구현 경계
 
-기반 구축 이후 첫 세로 기능은 `교사 가입·로그인 → 방 생성 → 수업일 생성 → 학생 코드 입장 → 교사 승인`이다. 카드, 상점, 차트는 이 흐름이 RLS 테스트를 통과한 뒤 이식한다.
+`교사 가입·로그인 → 방 생성 → 수업일 생성 → 학생 코드 입장 → 교사 승인 → 일일 3항목 평가 → 학생 자기관찰 → 등급 카드 → 상점 편집·구매·승인·진척 리포트 → 카드 아트 업로드`까지 연결되어 있다. 다음 구현 단위는 잔액 원자 RPC, 조커 원장, 차트·PWA다.

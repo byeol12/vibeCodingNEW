@@ -1,10 +1,32 @@
+import Link from "next/link";
 import { notFound } from "next/navigation";
-import { AppShell, FoundationNotice } from "@/components/app-shell";
-import { requireStudent } from "@/lib/auth/viewer";
+import { requestPurchase } from "@/app/me/purchase-actions";
+import { AppShell } from "@/components/app-shell";
+import { SubmitButton } from "@/components/submit-button";
+import { deriveProgress, evaluationCount } from "@/domain/progress";
+import { requireActiveStudent } from "@/lib/auth/viewer";
+import { createClient } from "@/lib/supabase/server";
 
 type StudentSectionPageProps = {
   params: Promise<{ section: string }>;
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
 };
+
+const gradeNames = {
+  C: "커먼",
+  U: "언커먼",
+  R: "레어",
+  E: "에픽",
+  L: "레전더리",
+  J: "조커",
+} as const;
+
+const purchaseStatusLabel = {
+  pending: "승인 대기",
+  approved: "승인됨",
+  rejected: "거절됨",
+  refunded: "환불됨",
+} as const;
 
 const sectionCopy: Record<string, { title: string; description: string }> = {
   dex: {
@@ -21,17 +43,359 @@ const sectionCopy: Record<string, { title: string; description: string }> = {
   },
 };
 
+function first(value: string | string[] | undefined) {
+  return Array.isArray(value) ? value[0] : value;
+}
+
 export default async function StudentSectionPage({
   params,
+  searchParams,
 }: StudentSectionPageProps) {
-  await requireStudent();
+  const viewer = await requireActiveStudent();
   const { section } = await params;
   const copy = sectionCopy[section];
   if (!copy) notFound();
+  const query = await searchParams;
+  const error = first(query.error);
+  const message = first(query.message);
+  const supabase = await createClient();
+  const [
+    { data: room },
+    { data: sessions },
+    { data: evaluations },
+    { data: reflections },
+    { data: shopItems },
+    { data: purchases },
+    { data: cardArts },
+  ] = await Promise.all([
+    supabase
+      .from("rooms")
+      .select("title")
+      .eq("id", viewer.roomId)
+      .maybeSingle(),
+    supabase
+      .from("sessions")
+      .select("id,session_date")
+      .eq("room_id", viewer.roomId)
+      .order("session_date"),
+    supabase
+      .from("evaluations")
+      .select(
+        "session_id,attitude,participation,homework,is_lucky,joker_used",
+      )
+      .eq("room_id", viewer.roomId)
+      .eq("student_id", viewer.studentId),
+    supabase
+      .from("reflections")
+      .select("session_id,praise_tags,struggle_tags")
+      .eq("room_id", viewer.roomId)
+      .eq("student_id", viewer.studentId),
+    supabase
+      .from("shop_items")
+      .select(
+        "id,icon,name,description,price,limit_month,limit_season,needs_approval",
+      )
+      .eq("room_id", viewer.roomId)
+      .eq("is_active", true)
+      .order("sort_order"),
+    supabase
+      .from("purchases")
+      .select("id,item_id,price_paid,status,requested_at,shop_items(name,icon)")
+      .eq("room_id", viewer.roomId)
+      .eq("student_id", viewer.studentId)
+      .order("requested_at", { ascending: false }),
+    section === "dex"
+      ? supabase
+          .from("card_arts")
+          .select("grade,storage_path")
+          .eq("room_id", viewer.roomId)
+      : Promise.resolve({ data: [] }),
+  ]);
+  const artUrlByGrade = new Map<string, string>();
+  await Promise.all(
+    (cardArts || []).map(async (art) => {
+      const { data } = await supabase.storage
+        .from("card-art")
+        .createSignedUrl(art.storage_path, 60 * 60);
+      if (data?.signedUrl) artUrlByGrade.set(art.grade, data.signedUrl);
+    }),
+  );
+  const today = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Seoul",
+  }).format(new Date());
+  const allSessions = sessions || [];
+  const pastSessions = allSessions.filter(
+    (session) => session.session_date <= today,
+  );
+  const allEvaluations = evaluations || [];
+  const allReflections = reflections || [];
+  const progress = deriveProgress(
+    pastSessions,
+    allEvaluations,
+    allReflections,
+  );
+  const cardCount = Object.values(progress.gradeAt).filter(Boolean).length;
+  const totalPast = Math.max(1, pastSessions.length);
+  const completionRate = (field: "attitude" | "participation" | "homework") =>
+    Math.round(
+      (allEvaluations.filter((evaluation) => evaluation[field]).length /
+        totalPast) *
+        100,
+    );
+  const stamps = allEvaluations.filter(
+    (evaluation) => evaluationCount(evaluation) === 3,
+  ).length;
+  const monthlyStamps = (() => {
+    const byMonth = new Map<string, { label: string; stamps: number; total: number }>();
+    for (const session of pastSessions) {
+      const key = session.session_date.slice(0, 7);
+      const entry = byMonth.get(key) || {
+        label: new Intl.DateTimeFormat("ko-KR", {
+          year: "numeric",
+          month: "short",
+        }).format(new Date(`${session.session_date}T00:00:00+09:00`)),
+        stamps: 0,
+        total: 0,
+      };
+      entry.total += 1;
+      const evaluation = allEvaluations.find(
+        (row) => row.session_id === session.id,
+      );
+      if (evaluationCount(evaluation) === 3) entry.stamps += 1;
+      byMonth.set(key, entry);
+    }
+    return [...byMonth.entries()]
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([, value]) => value)
+      .slice(-6);
+  })();
+  const spent =
+    purchases
+      ?.filter((purchase) => purchase.status === "approved")
+      .reduce((sum, purchase) => sum + purchase.price_paid, 0) || 0;
+  const reserved =
+    purchases
+      ?.filter((purchase) => purchase.status === "pending")
+      .reduce((sum, purchase) => sum + purchase.price_paid, 0) || 0;
+  const availablePoints = Math.max(
+    0,
+    progress.totalPoints - spent - reserved,
+  );
+  const pendingItemIds = new Set(
+    purchases
+      ?.filter((purchase) => purchase.status === "pending")
+      .map((purchase) => purchase.item_id) || [],
+  );
 
   return (
-    <AppShell eyebrow="Student" title={copy.title} description={copy.description}>
-      <FoundationNotice />
+    <AppShell
+      eyebrow={room?.title || "Student"}
+      title={copy.title}
+      description={copy.description}
+    >
+      <div className="actions">
+        <Link className="button" href="/me">
+          학생 홈
+        </Link>
+      </div>
+
+      {error && (
+        <p className="alert alert--error" role="alert">
+          {error}
+        </p>
+      )}
+      {message && (
+        <p className="alert alert--success" role="status">
+          {message}
+        </p>
+      )}
+
+      {section === "dex" && (
+        <>
+          <div className="collection-summary">
+            <strong>{cardCount}</strong>
+            <span>/ {allSessions.length}장 수집</span>
+          </div>
+          <ul className="dex-grid">
+            {allSessions.map((session, index) => {
+              const grade = progress.gradeAt[session.id];
+              const artUrl = grade ? artUrlByGrade.get(grade) : undefined;
+              return (
+                <li
+                  className={
+                    grade
+                      ? `dex-card dex-card--${grade}`
+                      : "dex-card dex-card--locked"
+                  }
+                  key={session.id}
+                >
+                  <span className="dex-card__number">#{index + 1}</span>
+                  {artUrl && grade ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      className="dex-card__art"
+                      src={artUrl}
+                      alt={`${gradeNames[grade]} 카드`}
+                    />
+                  ) : (
+                    <div aria-hidden="true">{grade ? "★" : "🔒"}</div>
+                  )}
+                  <strong>{grade ? gradeNames[grade] : "미획득"}</strong>
+                  <span>{session.session_date}</span>
+                </li>
+              );
+            })}
+          </ul>
+        </>
+      )}
+
+      {section === "stats" && (
+        <>
+          <div className="student-summary stats-summary">
+            <div>
+              <span>획득 카드</span>
+              <strong>{cardCount}장</strong>
+            </div>
+            <div>
+              <span>완성 도장</span>
+              <strong>{stamps}개</strong>
+            </div>
+            <div>
+              <span>최고 스트릭</span>
+              <strong>{progress.bestStreak}일</strong>
+            </div>
+          </div>
+          <section className="stats-panel">
+            <h2>평가 항목 완료율</h2>
+            {[
+              ["수업 태도", completionRate("attitude")],
+              ["수업 참여", completionRate("participation")],
+              ["숙제 확인", completionRate("homework")],
+            ].map(([label, rate]) => (
+              <div className="rate-row" key={String(label)}>
+                <div>
+                  <strong>{label}</strong>
+                  <span>{rate}%</span>
+                </div>
+                <div className="rate-track">
+                  <span style={{ width: `${rate}%` }} />
+                </div>
+              </div>
+            ))}
+          </section>
+          <section className="stats-panel">
+            <h2>월별 도장</h2>
+            {monthlyStamps.length ? (
+              <ul className="month-bars">
+                {monthlyStamps.map((month) => {
+                  const rate = month.total
+                    ? Math.round((month.stamps / month.total) * 100)
+                    : 0;
+                  return (
+                    <li key={month.label}>
+                      <div>
+                        <strong>{month.label}</strong>
+                        <span>
+                          {month.stamps}/{month.total}
+                        </span>
+                      </div>
+                      <div className="rate-track">
+                        <span style={{ width: `${rate}%` }} />
+                      </div>
+                    </li>
+                  );
+                })}
+              </ul>
+            ) : (
+              <p className="empty-state">아직 집계할 수업일이 없어요.</p>
+            )}
+          </section>
+        </>
+      )}
+
+      {section === "shop" && (
+        <>
+          <div className="shop-balance">
+            <span>사용 가능한 별 포인트</span>
+            <strong>{availablePoints}P</strong>
+          </div>
+          {shopItems?.length ? (
+            <ul className="shop-catalog">
+              {shopItems.map((item) => {
+                const pending = pendingItemIds.has(item.id);
+                const affordable = availablePoints >= item.price;
+                return (
+                  <li key={item.id}>
+                    <span className="shop-catalog__icon" aria-hidden="true">
+                      {item.icon}
+                    </span>
+                    <div>
+                      <strong>{item.name}</strong>
+                      <p>{item.description}</p>
+                      <small>
+                        {item.needs_approval ? "선생님 승인 필요" : "바로 사용"} ·{" "}
+                        {item.limit_month
+                          ? `월 ${item.limit_month}회`
+                          : item.limit_season
+                            ? `학기 ${item.limit_season}회`
+                            : "무제한"}
+                      </small>
+                      {pending || !affordable ? (
+                        <button className="button" type="button" disabled>
+                          {pending ? "승인 대기" : "포인트 부족"}
+                        </button>
+                      ) : (
+                        <form action={requestPurchase.bind(null, item.id)}>
+                          <SubmitButton
+                            className="button button--primary"
+                            pendingLabel="요청 중…"
+                          >
+                            {item.price}P 구매
+                          </SubmitButton>
+                        </form>
+                      )}
+                    </div>
+                    <b>{item.price}P</b>
+                  </li>
+                );
+              })}
+            </ul>
+          ) : (
+            <p className="empty-state">선생님이 상점 보상을 준비 중입니다.</p>
+          )}
+
+          {!!purchases?.length && (
+            <section className="section-block">
+              <div className="section-heading">
+                <div>
+                  <p className="eyebrow">History</p>
+                  <h2>구매 기록</h2>
+                </div>
+              </div>
+              <ul className="member-list">
+                {purchases.slice(0, 8).map((purchase) => {
+                  const item = Array.isArray(purchase.shop_items)
+                    ? purchase.shop_items[0]
+                    : purchase.shop_items;
+                  return (
+                    <li key={purchase.id}>
+                      <div>
+                        <strong>
+                          {item?.icon || "🎁"} {item?.name || "보상"}
+                        </strong>
+                        <span>
+                          {purchase.price_paid}P ·{" "}
+                          {purchaseStatusLabel[purchase.status]}
+                        </span>
+                      </div>
+                    </li>
+                  );
+                })}
+              </ul>
+            </section>
+          )}
+        </>
+      )}
     </AppShell>
   );
 }
