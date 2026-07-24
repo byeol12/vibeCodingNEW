@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { notFound } from "next/navigation";
 import {
   removeCardArt,
@@ -12,7 +11,9 @@ import {
   upsertShopItem,
 } from "@/app/room/[roomId]/shop-actions";
 import { AppShell } from "@/components/app-shell";
+import { SignOutButton } from "@/components/sign-out-button";
 import { SubmitButton } from "@/components/submit-button";
+import { TeacherRoomNav } from "@/components/teacher-room-nav";
 import { deriveProgress, evaluationCount } from "@/domain/progress";
 import { requireTeacher } from "@/lib/auth/viewer";
 import { createClient } from "@/lib/supabase/server";
@@ -44,8 +45,9 @@ const sectionCopy: Record<string, { title: string; description: string }> = {
     description: "등급별 이미지를 방 전용 Storage 경로에 등록합니다.",
   },
   report: {
-    title: "학생 진척도",
-    description: "방 전체 요약 차트와 학생별 도장·포인트·스트릭을 보여줍니다.",
+    title: "진척도 · 보너스",
+    description:
+      "학생별 도장·포인트·스트릭과 수동 보너스 지급을 한곳에서 관리합니다.",
   },
   approve: {
     title: "보상 승인",
@@ -84,6 +86,7 @@ export default async function RoomSectionPage({
   const [
     { data: shopItems },
     { data: pendingPurchases },
+    { count: pendingPurchaseCount },
     { data: students },
     { data: sessions },
     { data: evaluations },
@@ -112,6 +115,11 @@ export default async function RoomSectionPage({
           .eq("status", "pending")
           .order("requested_at")
       : Promise.resolve({ data: [] }),
+    supabase
+      .from("purchases")
+      .select("id", { count: "exact", head: true })
+      .eq("room_id", roomId)
+      .eq("status", "pending"),
     section === "report"
       ? supabase
           .from("students")
@@ -177,12 +185,17 @@ export default async function RoomSectionPage({
       eyebrow={room.title}
       title={copy.title}
       description={copy.description}
+      headerAccessory={
+        <SignOutButton message="선생님 계정에서 로그아웃할까요?" />
+      }
     >
-      <div className="actions">
-        <Link className="button" href={`/room/${roomId}`}>
-          수업 방으로 돌아가기
-        </Link>
-      </div>
+      <TeacherRoomNav
+        roomId={roomId}
+        active={section as "shop" | "art" | "report" | "approve"}
+        pendingApprovals={
+          pendingPurchaseCount || pendingPurchases?.length || 0
+        }
+      />
 
       {error && (
         <p className="alert alert--error" role="alert">
@@ -637,6 +650,11 @@ export default async function RoomSectionPage({
               className="room-form"
               action={uploadCardArt.bind(null, roomId)}
             >
+              <p className="form-help field--wide">
+                본인이 직접 촬영·제작했거나 사용 권한이 있는 이미지만
+                올려주세요. 캐릭터·연예인 등 타인의 저작물을 무단으로
+                올리면 저작권 문제가 발생할 수 있어요.
+              </p>
               <label className="field">
                 <span>등급</span>
                 <select name="grade" defaultValue="R" required>
@@ -650,6 +668,10 @@ export default async function RoomSectionPage({
               <label className="field field--wide">
                 <span>이미지 (PNG/JPG/WEBP/GIF, 2MB 이하)</span>
                 <input name="file" type="file" accept="image/png,image/jpeg,image/webp,image/gif" required />
+              </label>
+              <label className="field field--wide check-inline">
+                <input name="rightsConfirmed" type="checkbox" required />
+                <span>본인이 촬영·제작했거나 사용 권한이 있는 이미지입니다</span>
               </label>
               <div className="field--wide">
                 <SubmitButton pendingLabel="올리는 중…">아트 저장</SubmitButton>

@@ -233,16 +233,6 @@ export default async function StudentSectionPage({
     1,
     ...monthlyStamps.map((month) => month.stamps),
   );
-  const streakSeries = pastSessions.slice(-12).map((session) => ({
-    id: session.id,
-    date: session.session_date.slice(5),
-    streak: progress.streakAt[session.id] || 0,
-  }));
-  const maxStreakBar = Math.max(
-    1,
-    progress.bestStreak,
-    ...streakSeries.map((row) => row.streak),
-  );
   const reflectionRate = Math.round(
     (allReflections.filter((reflection) => reflection.praise_tags.length > 0)
       .length /
@@ -260,22 +250,6 @@ export default async function StudentSectionPage({
     allReflections.map((reflection) => ({ tags: reflection.struggle_tags })),
     struggleCatalog,
   );
-  const itemRates = [
-    { key: "attitude", label: "태도", rate: completionRate("attitude"), color: "#8b70e8" },
-    { key: "participation", label: "참여", rate: completionRate("participation"), color: "#74d2a1" },
-    { key: "homework", label: "숙제", rate: completionRate("homework"), color: "#ff9f7a" },
-  ];
-  const donutGradient = (() => {
-    const total = itemRates.reduce((sum, row) => sum + row.rate, 0) || 1;
-    let cursor = 0;
-    const parts = itemRates.map((row) => {
-      const start = cursor;
-      const sweep = (row.rate / total) * 360;
-      cursor += sweep;
-      return `${row.color} ${start}deg ${cursor}deg`;
-    });
-    return `conic-gradient(${parts.join(", ")})`;
-  })();
   const spent =
     purchases
       ?.filter((purchase) => purchase.status === "approved")
@@ -299,7 +273,9 @@ export default async function StudentSectionPage({
       eyebrow={room?.title || "Student"}
       title={copy.title}
       description={copy.description}
-      headerAccessory={<SignOutButton />}
+      headerAccessory={
+        <SignOutButton message="이 브라우저에서 학생 세션이 종료돼요." />
+      }
     >
       {error && (
         <p className="alert alert--error" role="alert">
@@ -315,8 +291,13 @@ export default async function StudentSectionPage({
       {section === "dex" && (
         <>
           <div className="collection-summary">
-            <strong>{cardCount}</strong>
-            <span>/ {allSessions.length}장 수집</span>
+            <strong>
+              {
+                pastSessions.filter((session) => progress.gradeAt[session.id])
+                  .length
+              }
+            </strong>
+            <span>/ {pastSessions.length}장 수집</span>
           </div>
           <ul className="dex-grid">
             {allSessions.map((session, index) => {
@@ -376,34 +357,6 @@ export default async function StudentSectionPage({
 
           <section className="stats-panel">
             <h2>평가 항목 완료율</h2>
-            <div className="stats-donut-row">
-              <div
-                className="stats-donut"
-                style={{ background: donutGradient }}
-                aria-hidden="true"
-              >
-                <span>
-                  {Math.round(
-                    itemRates.reduce((sum, row) => sum + row.rate, 0) / 3,
-                  )}
-                  %
-                </span>
-              </div>
-              <ul className="stats-donut-legend">
-                {itemRates.map((row) => (
-                  <li key={row.key}>
-                    <i style={{ background: row.color }} />
-                    <strong>{row.label}</strong>
-                    <span>{row.rate}%</span>
-                  </li>
-                ))}
-                <li>
-                  <i style={{ background: "#c9b8ef" }} />
-                  <strong>자기관찰</strong>
-                  <span>{reflectionRate}%</span>
-                </li>
-              </ul>
-            </div>
             {[
               ["수업 태도", completionRate("attitude")],
               ["수업 참여", completionRate("participation")],
@@ -478,6 +431,12 @@ export default async function StudentSectionPage({
             ) : (
               <p className="empty-state">아직 집계할 수업일이 없어요.</p>
             )}
+            <p className="form-help">
+              현재 스트릭 {progress.currentStreak}일
+              {progress.recovery
+                ? ` · 회복 ${progress.recovery.progress}/3`
+                : ""}
+            </p>
           </section>
 
           <section className="stats-panel">
@@ -510,7 +469,7 @@ export default async function StudentSectionPage({
             <h2>가장 많이 받은 칭찬</h2>
             {praiseTallies.length ? (
               <ul className="tag-rank" aria-label="칭찬 태그 순위">
-                {praiseTallies.slice(0, 6).map((row) => {
+                {praiseTallies.slice(0, 5).map((row) => {
                   const max = praiseTallies[0]?.count || 1;
                   return (
                     <li key={row.key}>
@@ -542,7 +501,7 @@ export default async function StudentSectionPage({
             </p>
             {struggleTallies.length ? (
               <ul className="tag-rank tag-rank--struggle" aria-label="방해 요인">
-                {struggleTallies.map((row) => {
+                {struggleTallies.slice(0, 5).map((row) => {
                   const max = struggleTallies[0]?.count || 1;
                   return (
                     <li key={row.key}>
@@ -567,82 +526,28 @@ export default async function StudentSectionPage({
           </section>
 
           <section className="stats-panel">
-            <h2>최근 스트릭</h2>
-            {streakSeries.length ? (
-              <ul className="streak-bars" aria-label="최근 수업일 스트릭">
-                {streakSeries.map((row) => (
-                  <li key={row.id}>
+            <h2>월별 도장</h2>
+            {monthlyStamps.length ? (
+              <ul className="month-cols" aria-label="월별 도장 수">
+                {monthlyStamps.map((month) => (
+                  <li key={month.label}>
                     <div
-                      className="streak-bars__col"
+                      className="month-cols__col"
                       style={{
                         height: `${Math.max(
-                          6,
-                          Math.round((row.streak / maxStreakBar) * 100),
+                          8,
+                          Math.round((month.stamps / maxMonthStamps) * 120),
                         )}px`,
                       }}
-                      title={`${row.date} · ${row.streak}일`}
+                      title={`${month.label} ${month.stamps}/${month.total}`}
                     />
-                    <span>{row.date}</span>
+                    <strong>{month.label}</strong>
+                    <span>
+                      {month.stamps}/{month.total}
+                    </span>
                   </li>
                 ))}
               </ul>
-            ) : (
-              <p className="empty-state">아직 집계할 수업일이 없어요.</p>
-            )}
-            <p className="form-help">
-              현재 스트릭 {progress.currentStreak}일 · 최고{" "}
-              {progress.bestStreak}일
-              {progress.recovery
-                ? ` · 회복 ${progress.recovery.progress}/3`
-                : ""}
-            </p>
-          </section>
-
-          <section className="stats-panel">
-            <h2>월별 도장</h2>
-            {monthlyStamps.length ? (
-              <>
-                <ul className="month-cols" aria-label="월별 도장 수">
-                  {monthlyStamps.map((month) => (
-                    <li key={month.label}>
-                      <div
-                        className="month-cols__col"
-                        style={{
-                          height: `${Math.max(
-                            8,
-                            Math.round(
-                              (month.stamps / maxMonthStamps) * 120,
-                            ),
-                          )}px`,
-                        }}
-                        title={`${month.label} ${month.stamps}/${month.total}`}
-                      />
-                      <strong>{month.label}</strong>
-                      <span>
-                        {month.stamps}/{month.total}
-                      </span>
-                    </li>
-                  ))}
-                </ul>
-                <ul className="month-bars">
-                  {monthlyStamps.map((month) => {
-                    const rate = month.total
-                      ? Math.round((month.stamps / month.total) * 100)
-                      : 0;
-                    return (
-                      <li key={`${month.label}-rate`}>
-                        <div>
-                          <strong>{month.label} 달성률</strong>
-                          <span>{rate}%</span>
-                        </div>
-                        <div className="rate-track">
-                          <span style={{ width: `${rate}%` }} />
-                        </div>
-                      </li>
-                    );
-                  })}
-                </ul>
-              </>
             ) : (
               <p className="empty-state">아직 집계할 수업일이 없어요.</p>
             )}

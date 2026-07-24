@@ -126,19 +126,18 @@ export function StudentJoinForm() {
       <button className="button button--primary" type="submit" disabled={pending}>
         {pending ? "입장 중…" : "입장 요청"}
       </button>
+      <p className="form-help">
+        선생님에게 받은 6자리 코드와 이름을 입력하면 돼요. 처음에는 승인 대기
+        상태가 됩니다. 선생님과 같은 브라우저라면 시크릿 창을 써 주세요.
+      </p>
       <button
-        className="button"
+        className="text-link"
         type="button"
         disabled={pending || resetting}
         onClick={resetSession}
       >
-        {resetting ? "초기화 중…" : "세션 초기화"}
+        {resetting ? "초기화 중…" : "입장에 문제가 있나요? 세션 초기화"}
       </button>
-      <p className="form-help">
-        학생 화면은 <strong>/me</strong> 입니다. 선생님 방 주소(/room/…)로는
-        들어가지 마세요. 선생님과 같은 브라우저면 InPrivate(시크릿) 창을 쓰세요.
-        처음 입장하면 선생님 승인 대기 상태가 됩니다.
-      </p>
     </form>
   );
 }

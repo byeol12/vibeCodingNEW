@@ -43,7 +43,15 @@ export async function uploadCardArt(roomId: string, formData: FormData) {
   await requireTeacher();
   const gradeRaw = String(formData.get("grade") || "").toUpperCase();
   const file = formData.get("file");
+  const rightsConfirmed = formData.get("rightsConfirmed") === "on";
 
+  if (!rightsConfirmed) {
+    artRedirect(
+      roomId,
+      "error",
+      "본인이 촬영·제작했거나 사용 권한이 있는 이미지인지 확인해 주세요.",
+    );
+  }
   if (!grades.has(gradeRaw as CardGrade)) {
     artRedirect(roomId, "error", "등급을 선택해 주세요.");
   }

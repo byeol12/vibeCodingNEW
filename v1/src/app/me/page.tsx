@@ -5,6 +5,7 @@ import { CardExport } from "@/components/card-export";
 import { RecoveryPrompt } from "@/components/recovery-prompt";
 import { RewardCard } from "@/components/reward-card";
 import { SignOutButton } from "@/components/sign-out-button";
+import { SoftRefresh } from "@/components/soft-refresh";
 import { StudentTabBar } from "@/components/student-tab-bar";
 import { SubmitButton } from "@/components/submit-button";
 import { deriveProgress, evaluationCount } from "@/domain/progress";
@@ -179,10 +180,12 @@ export default async function StudentHomePage({
 
   return (
     <AppShell
-      eyebrow="Student home"
+      eyebrow="학생 홈"
       title={statusCopy.title}
       description={statusCopy.description}
-      headerAccessory={<SignOutButton />}
+      headerAccessory={
+        <SignOutButton message="이 브라우저에서 학생 세션이 종료돼요." />
+      }
     >
       {error && (
         <p className="alert alert--error" role="alert">
@@ -202,7 +205,8 @@ export default async function StudentHomePage({
           </span>
           <div>
             <strong>선생님의 승인을 기다리고 있어요</strong>
-            <p>승인 후 이 페이지를 새로고침하면 바로 시작할 수 있습니다.</p>
+            <p>승인되면 자동으로 확인해요. 급하면 새로고침을 눌러 주세요.</p>
+            <SoftRefresh label="지금 확인하기" />
           </div>
         </div>
       )}
@@ -232,19 +236,11 @@ export default async function StudentHomePage({
             </p>
           )}
 
-          {progress.recovery && progress.recovery.progress < 3 ? (
-            <RecoveryPrompt
-              breakSessionId={progress.recovery.breakSessionId}
-              bestStreak={progress.bestStreak}
-              progress={progress.recovery.progress}
-            />
-          ) : null}
-
           {(jokers > 0 || jokerTargets.length > 0) && (
             <section className="section-block joker-panel">
               <div className="section-heading">
                 <div>
-                  <p className="eyebrow">Joker</p>
+                  <p className="eyebrow">조커</p>
                   <h2>조커 카드</h2>
                 </div>
                 <span className="count-badge">보유 {jokers}장</span>
@@ -288,7 +284,11 @@ export default async function StudentHomePage({
               </span>
               <div>
                 <strong>선생님 평가를 기다리고 있어요</strong>
-                <p>{currentSession.session_date} 수업 평가가 등록되면 카드가 열립니다.</p>
+                <p>
+                  {currentSession.session_date} 수업 평가가 등록되면 카드가
+                  열립니다.
+                </p>
+                <SoftRefresh label="평가 확인하기" />
               </div>
             </div>
           ) : (
@@ -317,10 +317,18 @@ export default async function StudentHomePage({
                 </CardExport>
               </CardCelebrate>
 
+              {progress.recovery && progress.recovery.progress < 3 ? (
+                <RecoveryPrompt
+                  breakSessionId={progress.recovery.breakSessionId}
+                  bestStreak={progress.bestStreak}
+                  progress={progress.recovery.progress}
+                />
+              ) : null}
+
               <section className="reflection-section">
                 <div className="section-heading">
                   <div>
-                    <p className="eyebrow">Self check</p>
+                    <p className="eyebrow">자기관찰</p>
                     <h2>오늘의 자기관찰</h2>
                   </div>
                   <span className="count-badge">칭찬 최대 3개</span>
@@ -332,7 +340,7 @@ export default async function StudentHomePage({
                   <fieldset>
                     <legend>오늘 잘한 것</legend>
                     <div className="reflection-chips">
-                      {praiseOptions.map(([value, label]) => (
+                      {praiseOptions.slice(0, 6).map(([value, label]) => (
                         <label key={value}>
                           <input
                             type="checkbox"
@@ -347,6 +355,25 @@ export default async function StudentHomePage({
                         </label>
                       ))}
                     </div>
+                    <details className="reflection-more">
+                      <summary>더 보기</summary>
+                      <div className="reflection-chips">
+                        {praiseOptions.slice(6).map(([value, label]) => (
+                          <label key={value}>
+                            <input
+                              type="checkbox"
+                              name="praise"
+                              value={value}
+                              defaultChecked={
+                                currentReflection?.praise_tags.includes(value) ||
+                                false
+                              }
+                            />
+                            <span>{label}</span>
+                          </label>
+                        ))}
+                      </div>
+                    </details>
                   </fieldset>
                   <fieldset>
                     <legend>
@@ -379,7 +406,7 @@ export default async function StudentHomePage({
                 <section className="reflection-section weekly-reflection">
                   <div className="section-heading">
                     <div>
-                      <p className="eyebrow">Weekly</p>
+                      <p className="eyebrow">주간 회고</p>
                       <h2>이번 주 회고</h2>
                     </div>
                     <span className="count-badge">

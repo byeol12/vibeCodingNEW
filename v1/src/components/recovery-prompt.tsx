@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useSyncExternalStore } from "react";
 
 type RecoveryPromptProps = {
   breakSessionId: string;
@@ -12,6 +12,38 @@ type RecoveryPromptProps = {
 const storageKey = (breakSessionId: string) =>
   `dojang-dismiss-recovery:${breakSessionId}`;
 
+const listeners = new Set<() => void>();
+
+function notify() {
+  for (const listener of listeners) listener();
+}
+
+function subscribe(callback: () => void) {
+  listeners.add(callback);
+  return () => listeners.delete(callback);
+}
+
+function isDismissed(breakSessionId: string) {
+  try {
+    return Boolean(sessionStorage.getItem(storageKey(breakSessionId)));
+  } catch {
+    return false;
+  }
+}
+
+function getServerSnapshot() {
+  return false;
+}
+
+function dismiss(breakSessionId: string) {
+  try {
+    sessionStorage.setItem(storageKey(breakSessionId), "1");
+  } catch {
+    // ignore private mode
+  }
+  notify();
+}
+
 export function RecoveryPrompt({
   breakSessionId,
   bestStreak,
@@ -19,25 +51,13 @@ export function RecoveryPrompt({
   awarded = false,
 }: RecoveryPromptProps) {
   const remaining = Math.max(0, 3 - progress);
-  const [visible, setVisible] = useState(false);
+  const dismissed = useSyncExternalStore(
+    subscribe,
+    () => isDismissed(breakSessionId),
+    getServerSnapshot,
+  );
 
-  useEffect(() => {
-    if (awarded || remaining <= 0) {
-      setVisible(false);
-      return;
-    }
-    try {
-      if (sessionStorage.getItem(storageKey(breakSessionId))) {
-        setVisible(false);
-        return;
-      }
-    } catch {
-      // ignore private mode
-    }
-    setVisible(true);
-  }, [awarded, breakSessionId, remaining]);
-
-  if (!visible) return null;
+  if (awarded || remaining <= 0 || dismissed) return null;
 
   return (
     <aside className="recovery-prompt" role="note">
@@ -52,14 +72,7 @@ export function RecoveryPrompt({
       <button
         type="button"
         className="button"
-        onClick={() => {
-          try {
-            sessionStorage.setItem(storageKey(breakSessionId), "1");
-          } catch {
-            // ignore
-          }
-          setVisible(false);
-        }}
+        onClick={() => dismiss(breakSessionId)}
       >
         알겠어요
       </button>

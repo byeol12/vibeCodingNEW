@@ -13,7 +13,7 @@ export async function updateStudentStatus(
   roomId: string,
   studentId: string,
   status: "active" | "revoked",
-  _formData: FormData,
+  _formData?: FormData,
 ) {
   void _formData;
   if (

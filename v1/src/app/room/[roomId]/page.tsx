@@ -5,7 +5,11 @@ import {
   updateStudentStatus,
 } from "@/app/room/[roomId]/actions";
 import { AppShell } from "@/components/app-shell";
+import { ConfirmActionButton } from "@/components/confirm-action-button";
+import { SessionSelect } from "@/components/session-select";
+import { SignOutButton } from "@/components/sign-out-button";
 import { SubmitButton } from "@/components/submit-button";
+import { TeacherRoomNav } from "@/components/teacher-room-nav";
 import { requireTeacher } from "@/lib/auth/viewer";
 import { createClient } from "@/lib/supabase/server";
 
@@ -13,13 +17,6 @@ type RoomPageProps = {
   params: Promise<{ roomId: string }>;
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 };
-
-const sections = [
-  ["shop", "상점 편집"],
-  ["art", "카드 아트"],
-  ["report", "진척도"],
-  ["approve", "승인 대기"],
-] as const;
 
 function first(value: string | string[] | undefined) {
   return Array.isArray(value) ? value[0] : value;
@@ -54,7 +51,11 @@ export default async function RoomPage({
   const today = new Intl.DateTimeFormat("en-CA", {
     timeZone: "Asia/Seoul",
   }).format(new Date());
-  const [{ data: students }, { data: sessions }] = await Promise.all([
+  const [
+    { data: students },
+    { data: sessions },
+    { count: pendingPurchaseCount },
+  ] = await Promise.all([
     supabase
       .from("students")
       .select("id,name,status,created_at")
@@ -65,6 +66,11 @@ export default async function RoomPage({
       .select("id,session_date,week_no,weekday")
       .eq("room_id", roomId)
       .order("session_date"),
+    supabase
+      .from("purchases")
+      .select("id", { count: "exact", head: true })
+      .eq("room_id", roomId)
+      .eq("status", "pending"),
   ]);
   const allSessions = sessions || [];
   const evaluableSessions = allSessions.filter(
@@ -96,21 +102,33 @@ export default async function RoomPage({
     .slice(0, 8);
   const error = first(query.error);
   const message = first(query.message);
-  const pendingStudents = students?.filter((student) => student.status === "pending") || [];
-  const activeStudents = students?.filter((student) => student.status === "active") || [];
-  const revokedStudents = students?.filter((student) => student.status === "revoked") || [];
+  const pendingStudents =
+    students?.filter((student) => student.status === "pending") || [];
+  const activeStudents =
+    students?.filter((student) => student.status === "active") || [];
+  const revokedStudents =
+    students?.filter((student) => student.status === "revoked") || [];
 
   return (
     <AppShell
-      eyebrow="Teacher room"
+      eyebrow="수업 방"
       title={room.title}
       description={`${room.start_date} ~ ${room.end_date} · 전체 수업 ${allSessions.length}회`}
+      headerAccessory={
+        <SignOutButton message="선생님 계정에서 로그아웃할까요?" />
+      }
     >
-      <div className="actions">
+      <div className="actions actions--room-top">
         <Link className="button" href="/dashboard">
           내 수업 방
         </Link>
       </div>
+
+      <TeacherRoomNav
+        roomId={roomId}
+        active="home"
+        pendingApprovals={pendingPurchaseCount || 0}
+      />
 
       {error && (
         <p className="alert alert--error" role="alert">
@@ -142,7 +160,7 @@ export default async function RoomPage({
       <section className="section-block" aria-labelledby="evaluation-title">
         <div className="section-heading">
           <div>
-            <p className="eyebrow">Today&apos;s class</p>
+            <p className="eyebrow">오늘 수업</p>
             <h2 id="evaluation-title">수업 평가</h2>
           </div>
           {selectedSession && (
@@ -153,24 +171,19 @@ export default async function RoomPage({
         </div>
 
         {evaluableSessions.length > 0 && (
-          <form className="session-picker" method="get">
-            <label className="field">
-              <span>평가할 수업일</span>
-              <select name="session" defaultValue={selectedSession?.id}>
-                {evaluableSessions
-                  .slice()
-                  .reverse()
-                  .map((session) => (
-                    <option key={session.id} value={session.id}>
-                      {formatDate(session.session_date)} · {session.week_no}주차
-                    </option>
-                  ))}
-              </select>
-            </label>
-            <button className="button" type="submit">
-              날짜 보기
-            </button>
-          </form>
+          <div className="session-picker">
+            <SessionSelect
+              roomId={roomId}
+              selectedId={selectedSession?.id}
+              sessions={evaluableSessions
+                .slice()
+                .reverse()
+                .map((session) => ({
+                  id: session.id,
+                  label: `${formatDate(session.session_date)} · ${session.week_no}주차`,
+                }))}
+            />
+          </div>
         )}
 
         {!selectedSession ? (
@@ -255,7 +268,7 @@ export default async function RoomPage({
       <section className="section-block" aria-labelledby="pending-title">
         <div className="section-heading">
           <div>
-            <p className="eyebrow">Approval</p>
+            <p className="eyebrow">입장</p>
             <h2 id="pending-title">학생 승인 대기</h2>
           </div>
           <span className="count-badge">{pendingStudents.length}명</span>
@@ -279,21 +292,20 @@ export default async function RoomPage({
                   >
                     <SubmitButton pendingLabel="승인 중…">승인</SubmitButton>
                   </form>
-                  <form
+                  <ConfirmActionButton
+                    className="button button--danger"
+                    label="거절"
+                    pendingLabel="거절 중…"
+                    title="입장을 거절할까요?"
+                    message={`${student.name} 학생의 입장 요청을 거절합니다.`}
+                    confirmLabel="거절"
                     action={updateStudentStatus.bind(
                       null,
                       roomId,
                       student.id,
                       "revoked",
                     )}
-                  >
-                    <SubmitButton
-                      className="button button--danger"
-                      pendingLabel="거절 중…"
-                    >
-                      거절
-                    </SubmitButton>
-                  </form>
+                  />
                 </div>
               </li>
             ))}
@@ -306,7 +318,7 @@ export default async function RoomPage({
       <section className="section-block" aria-labelledby="students-title">
         <div className="section-heading">
           <div>
-            <p className="eyebrow">Students</p>
+            <p className="eyebrow">학생</p>
             <h2 id="students-title">참여 학생</h2>
           </div>
           <span className="count-badge">{activeStudents.length}명</span>
@@ -319,21 +331,20 @@ export default async function RoomPage({
                   <strong>{student.name}</strong>
                   <span>수업 방 이용 가능</span>
                 </div>
-                <form
+                <ConfirmActionButton
+                  className="button button--danger"
+                  label="입장 중지"
+                  pendingLabel="중지 중…"
+                  title="입장을 중지할까요?"
+                  message={`${student.name} 학생은 카드·상점을 볼 수 없게 됩니다.`}
+                  confirmLabel="중지"
                   action={updateStudentStatus.bind(
                     null,
                     roomId,
                     student.id,
                     "revoked",
                   )}
-                >
-                  <SubmitButton
-                    className="button button--danger"
-                    pendingLabel="중지 중…"
-                  >
-                    입장 중지
-                  </SubmitButton>
-                </form>
+                />
               </li>
             ))}
           </ul>
@@ -370,7 +381,7 @@ export default async function RoomPage({
       <section className="section-block" aria-labelledby="schedule-title">
         <div className="section-heading">
           <div>
-            <p className="eyebrow">Schedule</p>
+            <p className="eyebrow">일정</p>
             <h2 id="schedule-title">다가오는 수업</h2>
           </div>
         </div>
@@ -387,17 +398,6 @@ export default async function RoomPage({
           <p className="empty-state">남은 수업이 없습니다.</p>
         )}
       </section>
-
-      <ul className="route-list">
-        {sections.map(([path, label]) => (
-          <li key={path}>
-            <Link href={`/room/${roomId}/${path}`}>
-              <strong>{label}</strong>
-              <span>{path}</span>
-            </Link>
-          </li>
-        ))}
-      </ul>
     </AppShell>
   );
 }

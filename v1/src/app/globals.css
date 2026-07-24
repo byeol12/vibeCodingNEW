@@ -554,6 +554,45 @@ button:disabled {
   box-shadow: 0 7px 0 #f4e4b8;
 }
 
+.student-entry--hero {
+  margin-top: 28px;
+  border-color: #cfc0f2;
+  background: linear-gradient(135deg, #f7f2ff, #eef8f3);
+  box-shadow: 0 7px 0 #e5dcf3;
+}
+
+.landing-auth {
+  margin-top: 22px;
+}
+
+.form-card--solo {
+  width: min(100%, 420px);
+  margin-inline: auto;
+}
+
+.landing-auth__switch {
+  margin: 4px 0 0;
+  text-align: center;
+}
+
+.landing-auth__switch a {
+  color: var(--primary-dark);
+  font-weight: 600;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.room-nav--5 {
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+}
+
+.room-nav__item.is-active {
+  border-color: var(--primary);
+  background: var(--primary-soft);
+  color: var(--primary-dark);
+  transform: translateY(-1px);
+}
+
 .student-entry strong,
 .student-entry span {
   display: block;
@@ -849,8 +888,116 @@ button:disabled {
   padding: 15px;
 }
 
+.session-picker__field,
 .session-picker .field {
   flex: 1;
+  margin: 0;
+}
+
+.room-nav {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+  margin: 18px 0 8px;
+}
+
+.room-nav__item {
+  position: relative;
+  display: grid;
+  justify-items: center;
+  gap: 4px;
+  min-height: 64px;
+  align-content: center;
+  border: 2px solid var(--line);
+  border-radius: 18px;
+  background: var(--surface);
+  padding: 10px 6px;
+  color: var(--foreground);
+  text-decoration: none;
+  box-shadow: 0 5px 0 var(--card-shadow);
+}
+
+.room-nav__item span {
+  font-size: 1.15rem;
+  line-height: 1;
+}
+
+.room-nav__item strong {
+  font-family: var(--font-jua), sans-serif;
+  font-size: 0.82rem;
+  font-weight: 400;
+}
+
+.room-nav__badge {
+  position: absolute;
+  top: 6px;
+  right: 8px;
+  min-width: 1.25rem;
+  border-radius: 999px;
+  background: var(--danger);
+  color: #fff;
+  font-style: normal;
+  font-size: 0.7rem;
+  line-height: 1.25rem;
+  text-align: center;
+  padding: 0 5px;
+}
+
+.actions--room-top {
+  margin-top: 8px;
+  margin-bottom: 0;
+}
+
+.create-room-details {
+  border: 2px dashed var(--line);
+  border-radius: 22px;
+  padding: 14px 16px;
+}
+
+.create-room-details summary {
+  cursor: pointer;
+  font-family: var(--font-jua), sans-serif;
+  font-size: 1.05rem;
+}
+
+.create-room-details[open] summary {
+  margin-bottom: 16px;
+}
+
+.text-link {
+  display: inline;
+  margin: 0;
+  border: 0;
+  background: none;
+  padding: 0;
+  color: var(--muted);
+  font: inherit;
+  font-size: 0.88rem;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+
+.text-link:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.button--refresh {
+  margin-top: 12px;
+  min-height: 40px;
+  padding: 0 14px;
+  font-size: 0.92rem;
+}
+
+.reflection-more {
+  margin-top: 12px;
+}
+
+.reflection-more summary {
+  cursor: pointer;
+  color: var(--muted);
+  font-size: 0.88rem;
 }
 
 .evaluation-grid {
@@ -1459,11 +1606,36 @@ button:disabled {
   flex-wrap: wrap;
   gap: 10px;
   justify-content: center;
+  align-items: center;
   max-width: 420px;
 }
 
 .card-export__actions .button {
   min-width: 7.5rem;
+}
+
+.card-export__more {
+  width: 100%;
+  text-align: center;
+}
+
+.card-export__more summary {
+  cursor: pointer;
+  color: var(--muted);
+  font-size: 0.85rem;
+  list-style: none;
+}
+
+.card-export__more summary::-webkit-details-marker {
+  display: none;
+}
+
+.card-export__more-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: center;
+  margin-top: 10px;
 }
 
 .card-export__status {
@@ -2353,6 +2525,14 @@ button:disabled {
 
   .student-summary {
     grid-template-columns: 1fr;
+  }
+
+  .room-nav {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .room-nav--5 {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 
   .session-picker {

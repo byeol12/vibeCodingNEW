@@ -123,28 +123,33 @@ export function CardExport({ fileName, children }: CardExportProps) {
       <div className="card-export__actions">
         <button
           type="button"
-          className="button"
-          disabled={busy !== null}
-          onClick={() => void downloadCard()}
-        >
-          {busy === "card" ? "만드는 중…" : "카드 저장"}
-        </button>
-        <button
-          type="button"
-          className="button"
-          disabled={busy !== null}
-          onClick={() => void downloadStory()}
-        >
-          {busy === "story" ? "만드는 중…" : "스토리용 저장"}
-        </button>
-        <button
-          type="button"
           className="button button--primary"
           disabled={busy !== null}
           onClick={() => void shareStory()}
         >
-          {busy === "share" ? "만드는 중…" : "스토리 공유"}
+          {busy === "share" ? "만드는 중…" : "스토리로 공유"}
         </button>
+        <details className="card-export__more">
+          <summary>다른 저장</summary>
+          <div className="card-export__more-actions">
+            <button
+              type="button"
+              className="button"
+              disabled={busy !== null}
+              onClick={() => void downloadStory()}
+            >
+              {busy === "story" ? "만드는 중…" : "스토리용 저장"}
+            </button>
+            <button
+              type="button"
+              className="button"
+              disabled={busy !== null}
+              onClick={() => void downloadCard()}
+            >
+              {busy === "card" ? "만드는 중…" : "카드만 저장"}
+            </button>
+          </div>
+        </details>
       </div>
       {message ? (
         <p className="card-export__status" role="status">

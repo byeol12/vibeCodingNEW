@@ -1,17 +1,26 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { signOut } from "@/app/auth/actions";
 
-type SignOutButtonProps = {
-  title?: string;
-  message?: string;
+type ConfirmActionButtonProps = {
+  action: () => Promise<void> | void;
+  label: string;
+  pendingLabel?: string;
+  className?: string;
+  title: string;
+  message: string;
+  confirmLabel?: string;
 };
 
-export function SignOutButton({
-  title = "나가겠습니까?",
-  message = "이 브라우저에서 세션이 종료돼요.",
-}: SignOutButtonProps) {
+export function ConfirmActionButton({
+  action,
+  label,
+  pendingLabel = "처리 중…",
+  className = "button",
+  title,
+  message,
+  confirmLabel = "예",
+}: ConfirmActionButtonProps) {
   const [open, setOpen] = useState(false);
   const [pending, startTransition] = useTransition();
 
@@ -19,11 +28,11 @@ export function SignOutButton({
     <>
       <button
         type="button"
-        className="button button--signout"
+        className={className}
         onClick={() => setOpen(true)}
         disabled={pending}
       >
-        로그아웃
+        {label}
       </button>
 
       {open ? (
@@ -31,14 +40,14 @@ export function SignOutButton({
           className="confirm-dialog"
           role="dialog"
           aria-modal="true"
-          aria-labelledby="signout-confirm-title"
+          aria-labelledby="confirm-action-title"
         >
           <div
             className="confirm-dialog__backdrop"
             onClick={() => setOpen(false)}
           />
           <div className="confirm-dialog__panel">
-            <h2 id="signout-confirm-title">{title}</h2>
+            <h2 id="confirm-action-title">{title}</h2>
             <p>{message}</p>
             <div className="confirm-dialog__actions">
               <button
@@ -51,15 +60,16 @@ export function SignOutButton({
               </button>
               <button
                 type="button"
-                className="button button--primary"
+                className="button button--danger"
                 disabled={pending}
                 onClick={() => {
                   startTransition(async () => {
-                    await signOut();
+                    await action();
+                    setOpen(false);
                   });
                 }}
               >
-                {pending ? "나가는 중…" : "예"}
+                {pending ? pendingLabel : confirmLabel}
               </button>
             </div>
           </div>

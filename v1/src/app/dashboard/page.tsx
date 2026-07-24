@@ -1,7 +1,7 @@
 import Link from "next/link";
-import { signOut } from "@/app/auth/actions";
 import { createRoom } from "@/app/dashboard/actions";
 import { AppShell } from "@/components/app-shell";
+import { SignOutButton } from "@/components/sign-out-button";
 import { SubmitButton } from "@/components/submit-button";
 import { requireTeacher } from "@/lib/auth/viewer";
 import { createClient } from "@/lib/supabase/server";
@@ -43,22 +43,21 @@ export default async function DashboardPage({
   const start = new Date();
   const end = new Date(start);
   end.setMonth(end.getMonth() + 3);
+  const hasRooms = Boolean(rooms?.length);
 
   return (
     <AppShell
-      eyebrow="Teacher"
+      eyebrow="선생님"
       title={`${profile?.display_name || "선생님"}의 수업 방`}
-      description="수업 일정을 입력하면 전체 수업일과 학생 입장 코드가 함께 만들어집니다."
+      description="수업 방을 열고, 코드로 학생을 초대하세요."
+      headerAccessory={
+        <SignOutButton message="선생님 계정에서 로그아웃할까요?" />
+      }
     >
       <div className="actions">
         <Link className="button" href="/dashboard/import">
           v0 가져오기
         </Link>
-        <form className="inline-logout" action={signOut}>
-          <SubmitButton className="button" pendingLabel="로그아웃 중…">
-            로그아웃
-          </SubmitButton>
-        </form>
       </div>
 
       {error && (
@@ -72,84 +71,17 @@ export default async function DashboardPage({
         </p>
       )}
 
-      <section className="section-block" aria-labelledby="create-room-title">
-        <div className="section-heading">
-          <div>
-            <p className="eyebrow">New room</p>
-            <h2 id="create-room-title">새 수업 방 만들기</h2>
-          </div>
-        </div>
-        <form className="room-form" action={createRoom}>
-          <label className="field field--wide">
-            <span>수업 방 이름</span>
-            <input
-              name="title"
-              placeholder="예: 중2 수학 과외"
-              required
-              maxLength={100}
-            />
-          </label>
-          <fieldset className="weekday-field">
-            <legend>수업 요일</legend>
-            <div className="weekday-options">
-              {[
-                [1, "월"],
-                [2, "화"],
-                [3, "수"],
-                [4, "목"],
-                [5, "금"],
-                [6, "토"],
-                [0, "일"],
-              ].map(([value, label]) => (
-                <label key={value}>
-                  <input
-                    type="checkbox"
-                    name="weekdays"
-                    value={value}
-                    defaultChecked={value === 2 || value === 4 || value === 5}
-                  />
-                  <span>{label}</span>
-                </label>
-              ))}
-            </div>
-          </fieldset>
-          <label className="field">
-            <span>시작일</span>
-            <input
-              name="startDate"
-              type="date"
-              defaultValue={dateInputValue(start)}
-              required
-            />
-          </label>
-          <label className="field">
-            <span>종료일</span>
-            <input
-              name="endDate"
-              type="date"
-              defaultValue={dateInputValue(end)}
-              required
-            />
-          </label>
-          <div className="field--wide">
-            <SubmitButton pendingLabel="수업일 만드는 중…">
-              방 만들기
-            </SubmitButton>
-          </div>
-        </form>
-      </section>
-
       <section className="section-block" aria-labelledby="room-list-title">
         <div className="section-heading">
           <div>
-            <p className="eyebrow">My rooms</p>
+            <p className="eyebrow">내 방</p>
             <h2 id="room-list-title">내 수업 방</h2>
           </div>
           <span className="count-badge">{rooms?.length || 0}개</span>
         </div>
-        {rooms?.length ? (
+        {hasRooms ? (
           <ul className="route-list">
-            {rooms.map((room) => (
+            {rooms!.map((room) => (
               <li key={room.id}>
                 <Link href={`/room/${room.id}`}>
                   <strong>{room.title}</strong>
@@ -161,9 +93,77 @@ export default async function DashboardPage({
             ))}
           </ul>
         ) : (
-          <p className="empty-state">아직 만든 수업 방이 없습니다.</p>
+          <p className="empty-state">아직 만든 수업 방이 없습니다. 아래에서 만들어 보세요.</p>
+        )}
+      </section>
+
+      <section className="section-block" aria-labelledby="create-room-title">
+        <div className="section-heading">
+          <div>
+            <p className="eyebrow">새 방</p>
+            <h2 id="create-room-title">새 수업 방 만들기</h2>
+          </div>
+        </div>
+        {hasRooms ? (
+          <details className="create-room-details">
+            <summary>새 방 만들기</summary>
+            <CreateRoomForm start={dateInputValue(start)} end={dateInputValue(end)} />
+          </details>
+        ) : (
+          <CreateRoomForm start={dateInputValue(start)} end={dateInputValue(end)} />
         )}
       </section>
     </AppShell>
+  );
+}
+
+function CreateRoomForm({ start, end }: { start: string; end: string }) {
+  return (
+    <form className="room-form" action={createRoom}>
+      <label className="field field--wide">
+        <span>수업 방 이름</span>
+        <input
+          name="title"
+          placeholder="예: 중2 수학 과외"
+          required
+          maxLength={100}
+        />
+      </label>
+      <fieldset className="weekday-field">
+        <legend>수업 요일</legend>
+        <div className="weekday-options">
+          {[
+            [1, "월"],
+            [2, "화"],
+            [3, "수"],
+            [4, "목"],
+            [5, "금"],
+            [6, "토"],
+            [0, "일"],
+          ].map(([value, label]) => (
+            <label key={value}>
+              <input
+                type="checkbox"
+                name="weekdays"
+                value={value}
+                defaultChecked={value === 2 || value === 4 || value === 5}
+              />
+              <span>{label}</span>
+            </label>
+          ))}
+        </div>
+      </fieldset>
+      <label className="field">
+        <span>시작일</span>
+        <input name="startDate" type="date" defaultValue={start} required />
+      </label>
+      <label className="field">
+        <span>종료일</span>
+        <input name="endDate" type="date" defaultValue={end} required />
+      </label>
+      <div className="field--wide">
+        <SubmitButton pendingLabel="수업일 만드는 중…">방 만들기</SubmitButton>
+      </div>
+    </form>
   );
 }
